@@ -34,6 +34,7 @@ add_executable(
    		contract_msvault.cpp
    		contract_nostromo.cpp
    		contract_qbay.cpp
+		contract_qblog.cpp
 		contract_qbond.cpp
    		contract_qearn.cpp
    		contract_qswap.cpp

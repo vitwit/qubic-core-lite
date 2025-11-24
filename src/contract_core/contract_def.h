@@ -195,6 +195,16 @@
 
 #endif
 
+#define QBLOG_CONTRACT_INDEX 19
+#define CONTRACT_INDEX QBLOG_CONTRACT_INDEX
+#define CONTRACT_STATE_TYPE QBLOG
+#define CONTRACT_STATE2_TYPE QBLOG2
+#include "contracts/QBlog.h"
+
+#undef CONTRACT_INDEX
+#undef CONTRACT_STATE_TYPE
+#undef CONTRACT_STATE2_TYPE
+
 // new contracts should be added above this line
 
 #ifdef INCLUDE_CONTRACT_TEST_EXAMPLES
@@ -300,6 +310,7 @@ constexpr struct ContractDescription
 #ifndef NO_QIP
     {"QIP", 189, 10000, sizeof(QIP)}, // proposal in epoch 187, IPO in 188, construction and first use in 189
 #endif
+    {"QBLOG", 190, 10000, sizeof(QBLOG)},
     // new contracts should be added above this line
 #ifdef INCLUDE_CONTRACT_TEST_EXAMPLES
     {"TESTEXA", 138, 10000, sizeof(TESTEXA)},
@@ -415,6 +426,7 @@ static void initializeContracts()
 #ifndef NO_QIP
     REGISTER_CONTRACT_FUNCTIONS_AND_PROCEDURES(QIP);
 #endif
+    REGISTER_CONTRACT_FUNCTIONS_AND_PROCEDURES(QBLOG);
     // new contracts should be added above this line
 #ifdef INCLUDE_CONTRACT_TEST_EXAMPLES
     REGISTER_CONTRACT_FUNCTIONS_AND_PROCEDURES(TESTEXA);

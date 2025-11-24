@@ -19,6 +19,11 @@
 
 using namespace QPI;
 
+// Helper macro for min - avoids Clang linker issues with constexpr template functions
+#ifndef RL_MIN
+#define RL_MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
 /// Maximum number of players allowed in the lottery for a single epoch (one entry == one ticket).
 constexpr uint16 RL_MAX_NUMBER_OF_PLAYERS = 1024;
 
@@ -582,7 +587,7 @@ public:
 	PUBLIC_FUNCTION(GetPlayers)
 	{
 		output.players = state.players;
-		output.playerCounter = min(state.playerCounter, state.players.capacity());
+		output.playerCounter = RL_MIN(state.playerCounter, state.players.capacity());
 	}
 
 	/**
@@ -700,7 +705,7 @@ public:
 		// Compute desired number of tickets and change
 		locals.desired = div(locals.reward, locals.price);    // How many tickets the caller attempts to buy
 		locals.remainder = mod(locals.reward, locals.price);  // Change to return
-		locals.toBuy = min(locals.desired, locals.slotsLeft); // Do not exceed available slots
+		locals.toBuy = RL_MIN(locals.desired, locals.slotsLeft); // Do not exceed available slots
 
 		// Add tickets (the same address may be inserted multiple times)
 		for (locals.i = 0; locals.i < locals.toBuy; ++locals.i)
@@ -708,7 +713,7 @@ public:
 			if (state.playerCounter < locals.capacity)
 			{
 				state.players.set(state.playerCounter, qpi.invocator());
-				state.playerCounter = min(state.playerCounter + 1, locals.capacity);
+				state.playerCounter = RL_MIN(state.playerCounter + 1, locals.capacity);
 			}
 		}
 
@@ -897,6 +902,4 @@ protected:
 
 	// Reads current net on-chain balance of SELF (incoming - outgoing).
 	static void getSCRevenue(const Entity& entity, uint64& revenue) { revenue = entity.incomingAmount - entity.outgoingAmount; }
-
-	template<typename T> static constexpr const T& min(const T& a, const T& b) { return (a < b) ? a : b; }
 };
