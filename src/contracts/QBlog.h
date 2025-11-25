@@ -7,7 +7,7 @@ struct Post
     id author;
     uint64 timestamp;
     uint32 likes;
-    bool deleted;
+    bit deleted;
     char title[64];
     char content[256];
 };
@@ -78,7 +78,7 @@ struct QBLOG : public ContractBase
     };
     struct EditPost_output
     {
-        bool success;
+        bit success;
     };
 
     PUBLIC_PROCEDURE(EditPost)
@@ -124,7 +124,7 @@ struct QBLOG : public ContractBase
     };
     struct DeletePost_output
     {
-        bool success;
+        bit success;
     };
 
     PUBLIC_PROCEDURE(DeletePost)
@@ -157,7 +157,7 @@ struct QBLOG : public ContractBase
     };
     struct LikePost_output
     {
-        bool success;
+        bit success;
         uint32 newLikeCount;
     };
 
@@ -188,7 +188,7 @@ struct QBLOG : public ContractBase
     struct GetPost_output
     {
         Post post;
-        bool exists;
+        bit exists;
     };
 
     PUBLIC_FUNCTION(GetPost)
@@ -219,7 +219,7 @@ struct QBLOG : public ContractBase
     {
         Post posts[10]; // Fixed size for simplicity, max 10 per page
         uint32 count;
-        bool hasMore;
+        bit hasMore;
     };
 
     PUBLIC_FUNCTION(GetPostsByUser)

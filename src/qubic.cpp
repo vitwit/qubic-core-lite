@@ -163,7 +163,12 @@ struct Processor : public CustomStack
 // Dynamic peers that can be added using command line
 std::vector<IPv4Address> knownPublicPeersDynamic;
 
-static volatile unsigned char mainAuxStatus = 0;
+#ifdef TESTNET
+static volatile unsigned char mainAuxStatus = 3; // Start in MAIN&MAIN mode for single testnet node
+#else
+static volatile unsigned char mainAuxStatus = 0; // Start in aux&aux mode for mainnet
+#endif
+
 static volatile unsigned char isVirtualMachine = 0; // indicate that it is running on VM, to avoid running some functions for BM  (for testing and developing purposes)
 static volatile bool forceRefreshPeerList = false;
 static volatile bool forceNextTick = false;

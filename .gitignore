@@ -15,6 +15,7 @@ x64/
 tmp
 build/
 .cache/
+__pycache__
 
 # Build directories and temporary files
 out/build/
@@ -23,3 +24,4 @@ out/build/
 
 # Clion
 .idea/
+.env

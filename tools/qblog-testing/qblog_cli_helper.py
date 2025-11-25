@@ -7,6 +7,8 @@ Converts text to qubic-cli format strings and generates ready-to-use commands
 import sys
 import argparse
 import os
+import subprocess
+import shlex
 from pathlib import Path
 
 def load_env():
@@ -24,7 +26,7 @@ def load_env():
     
     # Override with actual environment variables
     for key in ['QUBIC_NODE_IP', 'QUBIC_NODE_PORT', 'QBLOG_CONTRACT_INDEX', 
-                'QUBIC_SEED', 'DEFAULT_INVOCATION_REWARD']:
+                'QUBIC_SEED', 'DEFAULT_INVOCATION_REWARD', 'QUBIC_CLI_PATH']:
         if key in os.environ:
             env_vars[key] = os.environ[key]
     
@@ -45,79 +47,121 @@ def text_to_byte_array(text, max_length):
     
     return f"[{max_length};{','.join(byte_list)}]"
 
-def create_post_command(node_ip, node_port, seed, title, content, contract_index, reward=1000000):
+def create_post_command(cli_path, node_ip, node_port, seed, title, content, contract_index, reward=1000000):
     """Generate CreatePost command"""
     title_bytes = text_to_byte_array(title, 64)
     content_bytes = text_to_byte_array(content, 256)
     
     format_string = f'{{ {title_bytes}, {content_bytes} }}'
     
-    cmd = f"""./qubic-cli -nodeip {node_ip} -nodeport {node_port} \\
+    cmd = f"""{cli_path} -nodeip {node_ip} -nodeport {node_port} \\
   -seed {seed} \\
+  -enabletestcontracts \\
   -invokecontractprocedure {contract_index} 1 {reward} \\
   "{format_string}"
 """
     return cmd
 
-def edit_post_command(node_ip, node_port, seed, post_id, title, content, contract_index, reward=1000000):
+def edit_post_command(cli_path, node_ip, node_port, seed, post_id, title, content, contract_index, reward=1000000):
     """Generate EditPost command"""
     title_bytes = text_to_byte_array(title, 64)
     content_bytes = text_to_byte_array(content, 256)
     
     format_string = f'{{ {post_id}uint32, {title_bytes}, {content_bytes} }}'
     
-    cmd = f"""./qubic-cli -nodeip {node_ip} -nodeport {node_port} \\
+    cmd = f"""{cli_path} -nodeip {node_ip} -nodeport {node_port} \\
   -seed {seed} \\
+  -enabletestcontracts \\
   -invokecontractprocedure {contract_index} 2 {reward} \\
   "{format_string}"
 """
     return cmd
 
-def delete_post_command(node_ip, node_port, seed, post_id, contract_index, reward=1000000):
+def delete_post_command(cli_path, node_ip, node_port, seed, post_id, contract_index, reward=1000000):
     """Generate DeletePost command"""
     format_string = f'{{ {post_id}uint32 }}'
     
-    cmd = f"""./qubic-cli -nodeip {node_ip} -nodeport {node_port} \\
+    cmd = f"""{cli_path} -nodeip {node_ip} -nodeport {node_port} \\
   -seed {seed} \\
+  -enabletestcontracts \\
   -invokecontractprocedure {contract_index} 3 {reward} \\
   "{format_string}"
 """
     return cmd
 
-def like_post_command(node_ip, node_port, seed, post_id, contract_index, reward=1000000):
+def like_post_command(cli_path, node_ip, node_port, seed, post_id, contract_index, reward=1000000):
     """Generate LikePost command"""
     format_string = f'{{ {post_id}uint32 }}'
     
-    cmd = f"""./qubic-cli -nodeip {node_ip} -nodeport {node_port} \\
+    cmd = f"""{cli_path} -nodeip {node_ip} -nodeport {node_port} \\
   -seed {seed} \\
+  -enabletestcontracts \\
   -invokecontractprocedure {contract_index} 4 {reward} \\
   "{format_string}"
 """
     return cmd
 
-def get_post_command(node_ip, node_port, post_id, contract_index):
+def get_post_command(cli_path, node_ip, node_port, post_id, contract_index):
     """Generate GetPost command"""
     input_format = f'{{ {post_id}uint32 }}'
     output_format = '{ { id, uint64, uint32, uint8, [64;uint8], [256;uint8] } }'
     
-    cmd = f"""./qubic-cli -nodeip {node_ip} -nodeport {node_port} \\
+    cmd = f"""{cli_path} -enabletestcontracts -nodeip {node_ip} -nodeport {node_port} \\
   -callcontractfunction {contract_index} 5 \\
   "{input_format}" \\
   "{output_format}"
 """
     return cmd
 
-def get_posts_by_user_command(node_ip, node_port, author_id, page, page_size, contract_index):
+def get_posts_by_user_command(cli_path, node_ip, node_port, author_id, page, page_size, contract_index):
     """Generate GetPostsByUser command"""
     input_format = f'{{ {author_id}id, {page}uint32, {page_size}uint32 }}'
     output_format = '{ [10;{ id, uint64, uint32, uint8, [64;uint8], [256;uint8] }], uint32, uint8 }'
     
-    cmd = f"""./qubic-cli -nodeip {node_ip} -nodeport {node_port} \\
+    cmd = f"""{cli_path} -enabletestcontracts -nodeip {node_ip} -nodeport {node_port} \\
   -callcontractfunction {contract_index} 6 \\
   "{input_format}" \\
   "{output_format}"
 """
     return cmd
+
+def execute_command(cmd_string):
+    """Execute a command and return output"""
+    # Remove line continuations and extra whitespace
+    cmd_string = cmd_string.replace('\\\n', ' ').strip()
+    
+    print(f"\n{'='*60}")
+    print("Executing command:")
+    print(cmd_string)
+    print(f"{'='*60}\n")
+    
+    try:
+        # Use shell=True to handle the complex command string
+        result = subprocess.run(
+            cmd_string,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        print("Output:")
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print("Errors:", result.stderr)
+        
+        print(f"\n{'='*60}")
+        print(f"Exit code: {result.returncode}")
+        print(f"{'='*60}\n")
+        
+        return result.returncode == 0
+    except subprocess.TimeoutExpired:
+        print("Error: Command timed out after 30 seconds")
+        return False
+    except Exception as e:
+        print(f"Error executing command: {e}")
+        return False
 
 def main():
     # Load environment variables
@@ -155,6 +199,10 @@ Environment variables (or set in .env file):
     )
     
     subparsers = parser.add_subparsers(dest='command', help='Command to execute')
+    
+    # Identity command
+    identity_parser = subparsers.add_parser('identity', help='Get identity from seed')
+    identity_parser.add_argument('--seed', default=env.get('QUBIC_SEED'), help='Your 55-character lowercase seed')
     
     # Common arguments
     def add_common_args(p, include_seed=False):
@@ -212,35 +260,44 @@ Environment variables (or set in .env file):
         return
     
     # Execute command
-    if args.command == 'create':
-        cmd = create_post_command(args.node_ip, args.node_port, args.seed, 
+    cli_path = env.get('QUBIC_CLI_PATH', './qubic-cli')
+    
+    if args.command == 'identity':
+        if not args.seed:
+            print("Error: QUBIC_SEED not set. Please set it in .env file or use --seed argument.")
+            sys.exit(1)
+        cmd = f"{cli_path} -seed {args.seed} -getidentity"
+        execute_command(cmd)
+    
+    elif args.command == 'create':
+        cmd = create_post_command(cli_path, args.node_ip, args.node_port, args.seed, 
                                   args.title, args.content, args.contract_index, args.reward)
-        print(cmd)
+        execute_command(cmd)
     
     elif args.command == 'edit':
-        cmd = edit_post_command(args.node_ip, args.node_port, args.seed, args.post_id,
+        cmd = edit_post_command(cli_path, args.node_ip, args.node_port, args.seed, args.post_id,
                                args.title, args.content, args.contract_index, args.reward)
-        print(cmd)
+        execute_command(cmd)
     
     elif args.command == 'delete':
-        cmd = delete_post_command(args.node_ip, args.node_port, args.seed, 
+        cmd = delete_post_command(cli_path, args.node_ip, args.node_port, args.seed, 
                                  args.post_id, args.contract_index, args.reward)
-        print(cmd)
+        execute_command(cmd)
     
     elif args.command == 'like':
-        cmd = like_post_command(args.node_ip, args.node_port, args.seed,
+        cmd = like_post_command(cli_path, args.node_ip, args.node_port, args.seed,
                                args.post_id, args.contract_index, args.reward)
-        print(cmd)
+        execute_command(cmd)
     
     elif args.command == 'get':
-        cmd = get_post_command(args.node_ip, args.node_port, 
+        cmd = get_post_command(cli_path, args.node_ip, args.node_port, 
                               args.post_id, args.contract_index)
-        print(cmd)
+        execute_command(cmd)
     
     elif args.command == 'getbyuser':
-        cmd = get_posts_by_user_command(args.node_ip, args.node_port, args.author,
+        cmd = get_posts_by_user_command(cli_path, args.node_ip, args.node_port, args.author,
                                        args.page, args.page_size, args.contract_index)
-        print(cmd)
+        execute_command(cmd)
     
     elif args.command == 'convert':
         result = text_to_byte_array(args.text, args.max_length)
