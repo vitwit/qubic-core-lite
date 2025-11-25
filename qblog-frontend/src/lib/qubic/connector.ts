@@ -1,34 +1,41 @@
-// RPC Helper for transaction broadcasting
-// Note: QubicConnectorNode uses Node.js 'net' module which doesn't work in browser
-// We use RPC server for broadcasting transactions instead
+// Direct Qubic node connector (Node.js TCP)
+// This module provides a singleton connector that talks directly to the Qubic node
+// using the QubicConnector class (TCP). No custom RPC server or Next.js API routes are used.
 
-import { API_URL } from './node-service';
+import { QubicConnector } from '@qubic-lib/qubic-ts-library/dist/QubicConnector';
+
+// Environment variables – should be defined in .env.local (NEXT_PUBLIC_ prefix for client side)
+const NODE_IP = process.env.NEXT_PUBLIC_QUBIC_NODE_IP || '127.0.0.1';
+const NODE_PORT = process.env.NEXT_PUBLIC_QUBIC_NODE_PORT || '21841';
+
+// Initialise the connector with the node IP and then connect using the node port.
+export const connector = new QubicConnector(NODE_IP);
+connector.connect(NODE_PORT);
 
 /**
- * Broadcast transaction via internal API
+ * Ensure the connector is ready before using it.
  */
-async function broadcastTransactionViaRPC(txData: Uint8Array): Promise<string> {
-    try {
-        const response = await fetch(`${API_URL}/broadcast-transaction`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                encodedTransaction: Buffer.from(txData).toString('base64'),
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+export async function ensureConnected(): Promise<void> {
+    return new Promise((resolve) => {
+        // QubicConnector emits onReady when the socket is established.
+        if ((connector as any).ready) {
+            resolve();
+        } else {
+            (connector as any).onReady = resolve;
         }
-
-        const json = await response.json();
-        return json.transactionId || '';
-    } catch (error) {
-        console.error('Error broadcasting transaction via RPC:', error);
-        throw error;
-    }
+    });
 }
 
-export { broadcastTransactionViaRPC };
+/**
+ * Broadcast a transaction directly via the node.
+ * @param txData Uint8Array containing the encoded transaction.
+ * @returns Promise<string> transaction ID returned by the node.
+ */
+export async function broadcastTransaction(txData: Uint8Array): Promise<string> {
+    await ensureConnected();
+    // sendPackage returns a Uint8Array response; we assume it contains the transaction ID as UTF‑8.
+    const response = await (connector as any).sendPackage(txData);
+    return Buffer.from(response).toString('utf-8');
+}
+
+

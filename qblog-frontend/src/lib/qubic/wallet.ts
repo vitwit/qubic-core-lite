@@ -37,7 +37,7 @@ export const generateKeysFromSeed = async (seed: string): Promise<WalletKeys | n
 
         // Generate public key
         // createPublicKey(privateKey, schnorrq, K12)
-        const publicKey = keyHelper.createPublicKey(privateKey, crypto.schnorrq, crypto.K12);
+        const publicKey = (await qubicHelper.createIdPackage(seed)).publicKey
 
         // Get identity using QubicHelper with uppercase (lowerCase=false)
         // This matches the network's checksum calculation
