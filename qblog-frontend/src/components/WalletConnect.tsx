@@ -45,48 +45,34 @@ export const WalletConnect = ({ isOpen, onClose }: WalletConnectProps) => {
         setError('');
         setLoading(true);
         try {
+            // Check if MetaMask is installed
             if (!window.ethereum) {
-                throw new Error('MetaMask is not installed. Please install MetaMask Flask to use Snaps.');
+                throw new Error('MetaMask is not installed. Please install MetaMask to continue.');
             }
 
-            // Request Snap connection
-            await window.ethereum.request({
-                method: 'wallet_requestSnaps',
-                params: { [SNAP_ID]: {} },
-            });
+            // Check if Snaps are supported
+            try {
+                const snaps = await window.ethereum.request({
+                    method: 'wallet_getSnaps',
+                });
+                // If we get here, Snaps are supported
+            } catch (snapCheckError: any) {
+                if (snapCheckError.code === -32601) {
+                    throw new Error('MetaMask Snaps are not supported. Please install MetaMask Flask from https://metamask.io/flask/');
+                }
+            }
 
-            // Get Identity
-            const identity = await window.ethereum.request({
-                method: 'wallet_invokeSnap',
-                params: {
-                    snapId: SNAP_ID,
-                    request: { method: 'getIdentity' },
-                },
-            }) as string;
+            // Use the connectMetaMaskSnap function from wallet.ts
+            const { connectMetaMaskSnap } = await import('@/lib/qubic/wallet');
+            const walletKeys = await connectMetaMaskSnap();
 
-            // Get Public Key
-            const publicKeyHex = await window.ethereum.request({
-                method: 'wallet_invokeSnap',
-                params: {
-                    snapId: SNAP_ID,
-                    request: { method: 'getPublicKey' },
-                },
-            }) as string;
-
-            // Convert hex public key to Uint8Array
-            // Remove 0x prefix if present
-            const cleanHex = publicKeyHex.replace(/^0x/, '');
-            const publicKey = new Uint8Array(
-                cleanHex.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
-            );
-
-            if (publicKey.length === 0) {
-                throw new Error('Invalid public key received from Snap.');
+            if (!walletKeys) {
+                throw new Error('Failed to connect to MetaMask Snap');
             }
 
             connectWallet({
-                identity,
-                publicKey,
+                identity: walletKeys.identity,
+                publicKey: walletKeys.publicKey,
                 type: 'snap',
             });
 
@@ -94,7 +80,7 @@ export const WalletConnect = ({ isOpen, onClose }: WalletConnectProps) => {
 
         } catch (err: any) {
             console.error('Snap connection error:', err);
-            setError(err.message || 'Failed to connect to MetaMask Snap.');
+            setError(err.message || 'Failed to connect to MetaMask Snap. Make sure MetaMask Flask is installed.');
         } finally {
             setLoading(false);
         }

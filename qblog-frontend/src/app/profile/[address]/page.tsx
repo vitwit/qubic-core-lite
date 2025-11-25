@@ -28,31 +28,40 @@ export default function ProfilePage() {
 
     const loadPosts = async () => {
         try {
-            // Mock data for now
-            const mockPosts: PostWithId[] = [
-                {
-                    id: 0,
-                    author: address,
-                    timestamp: Math.floor(Date.now() / 1000) - 3600,
-                    likes: 42,
-                    deleted: false,
-                    title: 'My First Post',
-                    content: 'This is my first post on QBlog!',
-                },
-                {
-                    id: 1,
-                    author: address,
-                    timestamp: Math.floor(Date.now() / 1000) - 7200,
-                    likes: 28,
-                    deleted: false,
-                    title: 'Another Great Post',
-                    content: 'Sharing more thoughts with the community.',
-                },
-            ];
-            setPosts(mockPosts);
-            setHasMore(false);
+            setLoading(true);
+
+            // Import and use real API
+            const { getPostsByUser } = await import('@/lib/qubic/qblog-api');
+
+            const result = await getPostsByUser({
+                author: address,
+                page,
+                pageSize: 10,
+            });
+
+            // Convert to PostWithId format
+            const postsWithId: PostWithId[] = result.posts.map((post, index) => ({
+                id: page * 10 + index, // Approximate ID based on page
+                author: post.author,
+                timestamp: post.timestamp,
+                likes: post.likes,
+                deleted: post.deleted,
+                title: post.title,
+                content: post.content,
+            }));
+
+            if (page === 0) {
+                setPosts(postsWithId);
+            } else {
+                setPosts(prev => [...prev, ...postsWithId]);
+            }
+
+            setHasMore(result.hasMore);
         } catch (error) {
             console.error('Error loading posts:', error);
+            // Show empty state on error
+            setPosts([]);
+            setHasMore(false);
         } finally {
             setLoading(false);
         }

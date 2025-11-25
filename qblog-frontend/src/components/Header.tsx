@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, PenSquare, Home, User } from 'lucide-react';
+import { Menu, X, PenSquare, Home, User, Copy, Check } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
 import { WalletConnect } from './WalletConnect';
 import { truncateIdentity } from '@/lib/qubic/wallet';
@@ -11,9 +11,11 @@ import { truncateIdentity } from '@/lib/qubic/wallet';
 export const Header = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const { wallet, isConnected, disconnect, isModalOpen, openModal, closeModal } = useWallet();
+    const [copied, setCopied] = useState(false);
     const pathname = usePathname();
 
     const isHomePage = pathname === '/';
+    const isCreatePage = pathname === '/create';
 
     return (
         <>
@@ -42,7 +44,7 @@ export const Header = () => {
                                 </Link>
                             )}
 
-                            {isConnected && (
+                            {isConnected && !isCreatePage && (
                                 <>
                                     <Link
                                         href="/create"
@@ -68,6 +70,20 @@ export const Header = () => {
                                             <p className="font-mono text-sm text-gray-300">
                                                 {truncateIdentity(wallet?.identity || '')}
                                             </p>
+                                            <button
+                                                onClick={() => {
+                                                    if (wallet?.identity) {
+                                                        navigator.clipboard.writeText(wallet.identity);
+                                                        setCopied(true);
+                                                        setTimeout(() => setCopied(false), 1500);
+                                                    }
+                                                }}
+                                                className="text-gray-400 hover:text-white transition-colors"
+                                                title="Copy identity"
+                                            >
+                                                {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                                            </button>
+                                            {copied && <span className="text-xs text-green-400">Copied!</span>}
                                         </div>
                                         <button
                                             onClick={disconnect}
@@ -114,7 +130,7 @@ export const Header = () => {
                                 </Link>
                             )}
 
-                            {isConnected && (
+                            {isConnected && !isCreatePage && (
                                 <>
                                     <Link
                                         href="/create"

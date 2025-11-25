@@ -19,7 +19,7 @@ export default function PostDetailPage() {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
 
-    const postId = parseInt(params.id as string);
+    const postId = params ? parseInt(params.id as string) : 0;
     const isOwner = isConnected && wallet && post && post.author === wallet.identity;
 
     useEffect(() => {

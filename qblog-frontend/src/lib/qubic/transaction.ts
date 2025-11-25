@@ -3,8 +3,8 @@ import { QubicTransaction } from '@qubic-lib/qubic-ts-library/dist/qubic-types/Q
 import { QubicDefinitions } from '@qubic-lib/qubic-ts-library/dist/QubicDefinitions';
 import { PublicKey } from '@qubic-lib/qubic-ts-library/dist/qubic-types/PublicKey';
 import { Long } from '@qubic-lib/qubic-ts-library/dist/qubic-types/Long';
-import { getQubicConnector } from './connector';
-import { SimplePayload } from './SimplePayload';
+import { DynamicPayload } from '@qubic-lib/qubic-ts-library/dist/qubic-types/DynamicPayload';
+import { getCurrentTick, API_URL } from './node-service';
 
 const CONTRACT_INDEX = parseInt(process.env.NEXT_PUBLIC_QBLOG_CONTRACT_INDEX || '20');
 
@@ -20,33 +20,38 @@ export interface TransactionParams {
 /**
  * Build a transaction for QBlog contract
  */
+/**
+ * Build a transaction for QBlog contract
+ */
 export const buildTransaction = async (
     sourcePublicKey: Uint8Array,
-    inputType: number,
+    contractIndex: number,
+    procedureIndex: number,
     inputData: Uint8Array,
     privateKey?: Uint8Array
 ): Promise<QubicTransaction> => {
-    const connector = getQubicConnector() as any;
-
-    // Get current tick
-    const tickInfo = await connector.getTickInfo();
-    const currentTick = tickInfo.tick;
+    // Get current tick from RPC
+    const currentTick = await getCurrentTick();
 
     // Contract public key (derived from contract index)
     const contractPublicKeyBytes = new Uint8Array(32);
-    contractPublicKeyBytes[0] = CONTRACT_INDEX;
+    contractPublicKeyBytes[0] = contractIndex;
 
     const sourcePk = new PublicKey(sourcePublicKey);
     const destPk = new PublicKey(contractPublicKeyBytes);
+
+    // Create payload using DynamicPayload
+    const payload = new DynamicPayload(inputData.length);
+    payload.setPayload(inputData);
 
     const tx = new QubicTransaction();
     tx.sourcePublicKey = sourcePk;
     tx.destinationPublicKey = destPk;
     tx.amount = new Long(0); // No QU transfer, just contract call
-    tx.tick = currentTick + 5; // Target tick slightly in future
-    tx.inputType = inputType;
+    tx.tick = currentTick + 10; // Target tick slightly in future (as per official docs)
+    tx.inputType = procedureIndex; // Procedure index
     tx.inputSize = inputData.length;
-    tx.payload = new SimplePayload(inputData);
+    tx.payload = payload;
 
     if (privateKey) {
         // converting Uint8Array to string (assuming it might be a seed)
@@ -107,16 +112,36 @@ export const signWithSnap = async (tx: QubicTransaction): Promise<void> => {
 };
 
 /**
- * Broadcast a signed transaction
+ * Broadcast a signed transaction using RPC server
+ * Note: Browser can't use QubicConnectorNode (requires Node.js net module)
  */
 export const broadcastTransaction = async (
     tx: QubicTransaction
 ): Promise<string> => {
-    const connector = getQubicConnector() as any;
-
     try {
-        const result = await connector.sendTransaction(tx);
-        return result.txId || '';
+        // Get transaction package data
+        const txData = tx.getPackageData();
+
+        // Broadcast via Next.js API route (which connects directly to node)
+        const response = await fetch(`${API_URL}/broadcast-transaction`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                encodedTransaction: Buffer.from(txData).toString('base64'),
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const json = await response.json();
+        console.log('Transaction broadcast successfully');
+        console.log('Target tick:', tx.tick);
+
+        return json.transactionId || tx.id || '';
     } catch (error) {
         console.error('Error broadcasting transaction:', error);
         throw error;
