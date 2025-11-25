@@ -22,9 +22,7 @@ struct QBLOG : public ContractBase
     // Using Collection to index posts by author (PoV)
     Collection<Post, 1024> posts;
 
-    // -------------------------------------------------------------------------
     // Create Post
-    // -------------------------------------------------------------------------
     struct CreatePost_input
     {
         char title[64];
@@ -71,9 +69,7 @@ struct QBLOG : public ContractBase
         }
     }
 
-    // -------------------------------------------------------------------------
     // Edit Post
-    // -------------------------------------------------------------------------
     struct EditPost_input
     {
         uint32 postId;
@@ -88,7 +84,8 @@ struct QBLOG : public ContractBase
     PUBLIC_PROCEDURE(EditPost)
     {
         sint64 index = (sint64)input.postId;
-        if (index < 0 || index >= state.posts.capacity()) // Basic bounds check, though element() masks it
+        // Basic bounds check
+        if (index < 0 || index >= state.posts.capacity())
         {
              output.success = false;
              return;
@@ -120,9 +117,7 @@ struct QBLOG : public ContractBase
         output.success = true;
     }
 
-    // -------------------------------------------------------------------------
     // Delete Post
-    // -------------------------------------------------------------------------
     struct DeletePost_input
     {
         uint32 postId;
@@ -155,9 +150,7 @@ struct QBLOG : public ContractBase
         output.success = true;
     }
 
-    // -------------------------------------------------------------------------
     // Like Post
-    // -------------------------------------------------------------------------
     struct LikePost_input
     {
         uint32 postId;
@@ -187,9 +180,7 @@ struct QBLOG : public ContractBase
         output.newLikeCount = post.likes;
     }
 
-    // -------------------------------------------------------------------------
     // Get Post
-    // -------------------------------------------------------------------------
     struct GetPost_input
     {
         uint32 postId;
@@ -203,10 +194,6 @@ struct QBLOG : public ContractBase
     PUBLIC_FUNCTION(GetPost)
     {
         sint64 index = (sint64)input.postId;
-        // There is no easy way to check if an index is valid/occupied in Collection by random access 
-        // without iterating or checking a sentinel.
-        // We assume the user provides a valid ID returned by CreatePost.
-        // We can check if the post looks "empty" (e.g. 0 timestamp, 0 author) if we assume 0 is invalid.
         
         output.post = state.posts.element(index);
         
@@ -221,13 +208,11 @@ struct QBLOG : public ContractBase
         }
     }
 
-    // -------------------------------------------------------------------------
     // Get Posts By User
-    // -------------------------------------------------------------------------
     struct GetPostsByUser_input
     {
         id author;
-        uint32 page; // 0-indexed
+        uint32 page;
         uint32 pageSize;
     };
     struct GetPostsByUser_output
@@ -277,9 +262,6 @@ struct QBLOG : public ContractBase
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Registration
-    // -------------------------------------------------------------------------
     REGISTER_USER_FUNCTIONS_AND_PROCEDURES()
     {
         REGISTER_USER_PROCEDURE(CreatePost, 1);
