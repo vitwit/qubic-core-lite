@@ -1,5 +1,6 @@
+#define NO_UEFI
+
 #include "contract_testing.h"
-#include "contracts/QBlog.h"
 
 class ContractTestingQBlog : public ContractTesting
 {
