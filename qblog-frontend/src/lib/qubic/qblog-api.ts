@@ -103,7 +103,7 @@ export async function createPost(
     );
 
     await broadcastTransactionViaNode(tx);
-    return { postId: -1 };
+    return { postId: -1, returnCode: 0 };
 }
 
 export async function editPost(
@@ -127,7 +127,7 @@ export async function editPost(
     );
 
     await broadcastTransactionViaNode(tx);
-    return { success: true };
+    return { returnCode: 0 };
 }
 
 export async function deletePost(
@@ -147,7 +147,7 @@ export async function deletePost(
     );
 
     await broadcastTransactionViaNode(tx);
-    return { success: true };
+    return { returnCode: 0 };
 }
 
 export async function likePost(
@@ -167,7 +167,7 @@ export async function likePost(
     );
 
     await broadcastTransactionViaNode(tx);
-    return { success: true, newLikeCount: 0 };
+    return { newLikeCount: 0, returnCode: 0 };
 }
 
 export { CONTRACT_INDEX };

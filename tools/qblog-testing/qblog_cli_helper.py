@@ -121,7 +121,7 @@ def get_post_command(cli_path, node_ip, node_port, post_id, contract_index):
 def get_posts_by_user_command(cli_path, node_ip, node_port, author_id, page, page_size, contract_index):
     """Generate GetPostsByUser command"""
     input_format = f'{{ {author_id}id, {page}uint32, {page_size}uint32 }}'
-    output_format = '{ [10;{ id, uint64, uint32, uint8, [64;sint8], [256;sint8] }], uint32, uint8 }'
+    output_format = '{ [16;{ id, uint64, uint32, uint8, [64;sint8], [256;sint8] }], uint32, uint8 }'
     
     cmd = f"""{cli_path} -enabletestcontracts -nodeip {node_ip} -nodeport {node_port} \\
   -callcontractfunction {contract_index} 6 \\
@@ -129,6 +129,18 @@ def get_posts_by_user_command(cli_path, node_ip, node_port, author_id, page, pag
   "{output_format}"
 """
     return cmd
+
+def decode_return_code(code):
+    """Decode QBlog return code to human-readable message"""
+    codes = {
+        0: "Success",
+        1: "Contract Full",
+        2: "Invalid Post ID",
+        3: "Unauthorized",
+        4: "Post Deleted",
+        5: "Post Not Found",
+    }
+    return codes.get(code, f"Unknown ({code})")
 
 def execute_command(cmd_string):
     """Execute a command and return output"""
@@ -153,6 +165,17 @@ def execute_command(cmd_string):
         print("Output:")
         if result.stdout:
             print(result.stdout)
+            
+            # Try to parse and display return code if present
+            import re
+            # Look for returnCode in the output (format may vary)
+            return_code_match = re.search(r'returnCode["\s:]*(\d+)', result.stdout)
+            if return_code_match:
+                code = int(return_code_match.group(1))
+                print(f"\n{'='*60}")
+                print(f"Return Code: {code} - {decode_return_code(code)}")
+                print(f"{'='*60}")
+        
         if result.stderr:
             print("Errors:", result.stderr)
         

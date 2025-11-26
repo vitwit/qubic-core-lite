@@ -16,6 +16,7 @@ export interface CreatePostInput {
 
 export interface CreatePostOutput {
     postId: number;
+    returnCode: number;
 }
 
 export interface EditPostInput {
@@ -25,7 +26,7 @@ export interface EditPostInput {
 }
 
 export interface EditPostOutput {
-    success: boolean;
+    returnCode: number;
 }
 
 export interface DeletePostInput {
@@ -33,7 +34,7 @@ export interface DeletePostInput {
 }
 
 export interface DeletePostOutput {
-    success: boolean;
+    returnCode: number;
 }
 
 export interface LikePostInput {
@@ -41,8 +42,8 @@ export interface LikePostInput {
 }
 
 export interface LikePostOutput {
-    success: boolean;
     newLikeCount: number;
+    returnCode: number;
 }
 
 export interface GetPostInput {
@@ -64,6 +65,16 @@ export interface GetPostsByUserOutput {
     posts: Post[];
     count: number;
     hasMore: boolean;
+}
+
+// Return Code Enum
+export enum QBlogReturnCode {
+    Success = 0,
+    ContractFull = 1,
+    InvalidPostId = 2,
+    Unauthorized = 3,
+    PostDeleted = 4,
+    PostNotFound = 5,
 }
 
 // UI Types

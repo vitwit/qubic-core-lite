@@ -145,6 +145,7 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
 
     // 1. Create Post
     auto createOut = qblog.createPost(user1, "First Post", "Hello World");
+    EXPECT_EQ(createOut.returnCode, 0); // success
     EXPECT_NE(createOut.postId, (uint32)-1);
     uint32 postId = createOut.postId;
 
@@ -159,7 +160,7 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
 
     // 3. Edit Post
     auto editOut = qblog.editPost(user1, postId, "Updated Title", "Updated Content");
-    EXPECT_TRUE(editOut.success);
+    EXPECT_EQ(editOut.returnCode, 0); // success
 
     getOut = qblog.getPost(postId);
     EXPECT_TRUE(qblog.arrayEquals(getOut.post.title, "Updated Title"));
@@ -167,14 +168,14 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
 
     // 3.1 Edit Post (Unauthorized)
     editOut = qblog.editPost(user2, postId, "Hacked", "Hacked");
-    EXPECT_FALSE(editOut.success);
+    EXPECT_EQ(editOut.returnCode, 3); // unauthorized
 
     getOut = qblog.getPost(postId);
     EXPECT_TRUE(qblog.arrayEquals(getOut.post.title, "Updated Title")); // Should remain unchanged
 
     // 4. Like Post
     auto likeOut = qblog.likePost(user2, postId);
-    EXPECT_TRUE(likeOut.success);
+    EXPECT_EQ(likeOut.returnCode, 0); // success
     EXPECT_EQ(likeOut.newLikeCount, 1);
 
     getOut = qblog.getPost(postId);
@@ -191,7 +192,7 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
 
     // 6. Delete Post
     auto deleteOut = qblog.deletePost(user1, postId);
-    EXPECT_TRUE(deleteOut.success);
+    EXPECT_EQ(deleteOut.returnCode, 0); // success
 
     getOut = qblog.getPost(postId);
     EXPECT_TRUE(getOut.post.deleted);
@@ -200,7 +201,7 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
     // Create a post for user2
     auto createOut2 = qblog.createPost(user2, "User2 Post", "Content");
     deleteOut = qblog.deletePost(user1, createOut2.postId);
-    EXPECT_FALSE(deleteOut.success);
+    EXPECT_EQ(deleteOut.returnCode, 3); // unauthorized
 
     // 7. Verify GetPostsByUser skips deleted
     postsOut = qblog.getPostsByUser(user1, 0, 10);

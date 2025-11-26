@@ -2,6 +2,21 @@
 
 using namespace QPI;
 
+enum class QBlogLogInfo {
+    success = 0,
+    contractFull = 1,
+    invalidPostId = 2,
+    unauthorized = 3,
+    postDeleted = 4,
+    postNotFound = 5,
+};
+
+struct QBlogLogger {
+    uint32 _contractIndex;
+    uint32 _type;
+    sint8 _terminator;
+};
+
 struct Post
 {
     id author;
@@ -31,14 +46,23 @@ struct QBLOG : public ContractBase
     struct CreatePost_output
     {
         uint32 postId;
+        uint32 returnCode;
     };
 
-    PUBLIC_PROCEDURE(CreatePost)
+    struct CreatePost_locals
+    {
+        QBlogLogger log;
+    };
+
+    PUBLIC_PROCEDURE_WITH_LOCALS(CreatePost)
     {
         if (state.posts.population() >= state.posts.capacity())
         {
             // Contract full
             output.postId = -1;
+            output.returnCode = static_cast<uint32>(QBlogLogInfo::contractFull);
+            locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::contractFull), 0 };
+            LOG_INFO(locals.log);
             return;
         }
 
@@ -62,10 +86,16 @@ struct QBLOG : public ContractBase
         if (index == NULL_INDEX)
         {
              output.postId = -1;
+             output.returnCode = static_cast<uint32>(QBlogLogInfo::contractFull);
+             locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::contractFull), 0 };
+             LOG_INFO(locals.log);
         }
         else
         {
              output.postId = (uint32)index;
+             output.returnCode = static_cast<uint32>(QBlogLogInfo::success);
+             locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::success), 0 };
+             LOG_INFO(locals.log);
         }
     }
 
@@ -78,16 +108,23 @@ struct QBLOG : public ContractBase
     };
     struct EditPost_output
     {
-        bit success;
+        uint32 returnCode;
     };
 
-    PUBLIC_PROCEDURE(EditPost)
+    struct EditPost_locals
+    {
+        QBlogLogger log;
+    };
+
+    PUBLIC_PROCEDURE_WITH_LOCALS(EditPost)
     {
         sint64 index = (sint64)input.postId;
         // Basic bounds check
         if (index < 0 || index >= state.posts.capacity())
         {
-             output.success = false;
+             output.returnCode = static_cast<uint32>(QBlogLogInfo::invalidPostId);
+             locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::invalidPostId), 0 };
+             LOG_INFO(locals.log);
              return;
         }
         
@@ -96,13 +133,17 @@ struct QBLOG : public ContractBase
         // Check authorization
         if (post.author != qpi.invocator())
         {
-            output.success = false;
+            output.returnCode = static_cast<uint32>(QBlogLogInfo::unauthorized);
+            locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::unauthorized), 0 };
+            LOG_INFO(locals.log);
             return;
         }
 
         if (post.deleted)
         {
-            output.success = false;
+            output.returnCode = static_cast<uint32>(QBlogLogInfo::postDeleted);
+            locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::postDeleted), 0 };
+            LOG_INFO(locals.log);
             return;
         }
 
@@ -114,7 +155,9 @@ struct QBLOG : public ContractBase
         post.content.set(255, 0);
 
         state.posts.replace(index, post);
-        output.success = true;
+        output.returnCode = static_cast<uint32>(QBlogLogInfo::success);
+        locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::success), 0 };
+        LOG_INFO(locals.log);
     }
 
     // Delete Post
@@ -124,30 +167,41 @@ struct QBLOG : public ContractBase
     };
     struct DeletePost_output
     {
-        bit success;
+        uint32 returnCode;
     };
 
-    PUBLIC_PROCEDURE(DeletePost)
+    struct DeletePost_locals
+    {
+        QBlogLogger log;
+    };
+
+    PUBLIC_PROCEDURE_WITH_LOCALS(DeletePost)
     {
         sint64 index = (sint64)input.postId;
         Post post = state.posts.element(index);
 
         if (post.author != qpi.invocator())
         {
-            output.success = false;
+            output.returnCode = static_cast<uint32>(QBlogLogInfo::unauthorized);
+            locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::unauthorized), 0 };
+            LOG_INFO(locals.log);
             return;
         }
 
         if (post.deleted)
         {
-            output.success = false;
+            output.returnCode = static_cast<uint32>(QBlogLogInfo::postDeleted);
+            locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::postDeleted), 0 };
+            LOG_INFO(locals.log);
             return;
         }
 
         post.deleted = true;
         state.posts.replace(index, post);
         // We do NOT remove from collection to keep indices stable.
-        output.success = true;
+        output.returnCode = static_cast<uint32>(QBlogLogInfo::success);
+        locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::success), 0 };
+        LOG_INFO(locals.log);
     }
 
     // Like Post
@@ -157,27 +211,36 @@ struct QBLOG : public ContractBase
     };
     struct LikePost_output
     {
-        bit success;
         uint32 newLikeCount;
+        uint32 returnCode;
     };
 
-    PUBLIC_PROCEDURE(LikePost)
+    struct LikePost_locals
+    {
+        QBlogLogger log;
+    };
+
+    PUBLIC_PROCEDURE_WITH_LOCALS(LikePost)
     {
         sint64 index = (sint64)input.postId;
         Post post = state.posts.element(index);
 
         if (post.deleted)
         {
-            output.success = false;
             output.newLikeCount = post.likes;
+            output.returnCode = static_cast<uint32>(QBlogLogInfo::postDeleted);
+            locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::postDeleted), 0 };
+            LOG_INFO(locals.log);
             return;
         }
 
         post.likes++;
         state.posts.replace(index, post);
         
-        output.success = true;
         output.newLikeCount = post.likes;
+        output.returnCode = static_cast<uint32>(QBlogLogInfo::success);
+        locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::success), 0 };
+        LOG_INFO(locals.log);
     }
 
     // Get Post
