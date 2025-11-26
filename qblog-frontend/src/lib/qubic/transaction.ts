@@ -1,4 +1,4 @@
-// Transaction Building and Broadcasting (direct node connection)
+// Transaction Building and Broadcasting (via API routes)
 
 import { QubicTransaction } from '@qubic-lib/qubic-ts-library/dist/qubic-types/QubicTransaction';
 import { QubicDefinitions } from '@qubic-lib/qubic-ts-library/dist/QubicDefinitions';
@@ -6,19 +6,34 @@ import { PublicKey } from '@qubic-lib/qubic-ts-library/dist/qubic-types/PublicKe
 import { Long } from '@qubic-lib/qubic-ts-library/dist/qubic-types/Long';
 import { DynamicPayload } from '@qubic-lib/qubic-ts-library/dist/qubic-types/DynamicPayload';
 import { Signature } from '@qubic-lib/qubic-ts-library/dist/qubic-types/Signature';
-import { ensureConnected, broadcastTransaction } from './connector';
 
 // ---------------------------------------------------------------------------
-// Helper: get current tick (fallback to timestamp based calculation)
+// Helper: get current tick from node via API route
 // ---------------------------------------------------------------------------
 /**
- * Returns the current network tick. If the node does not provide a tick via an
- * event, we fall back to the timestamp‑based calculation used previously.
+ * Returns the current network tick by querying the Qubic node via our API route.
  */
 export async function getCurrentTick(): Promise<number> {
-    const QUBIC_EPOCH = new Date('2024-04-03T12:00:00Z').getTime();
-    const now = Date.now();
-    return Math.floor((now - QUBIC_EPOCH) / 1000);
+    try {
+        const response = await fetch('/api/tick');
+        const data = await response.json();
+
+        if (data.success && data.tick) {
+            return data.tick;
+        }
+
+        // Fallback to timestamp-based calculation if API fails
+        console.warn('Failed to get tick from API, using fallback');
+        const QUBIC_EPOCH = new Date('2024-04-03T12:00:00Z').getTime();
+        const now = Date.now();
+        return Math.floor((now - QUBIC_EPOCH) / 1000);
+    } catch (error) {
+        console.error('Error getting current tick:', error);
+        // Fallback to timestamp-based calculation
+        const QUBIC_EPOCH = new Date('2024-04-03T12:00:00Z').getTime();
+        const now = Date.now();
+        return Math.floor((now - QUBIC_EPOCH) / 1000);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -57,8 +72,8 @@ export const buildTransaction = async (
     const tx = new QubicTransaction();
     tx.sourcePublicKey = sourcePk;
     tx.destinationPublicKey = destPk;
-    tx.amount = new Long(0);
-    tx.tick = currentTick + 10;
+    tx.amount = new Long(1000000);
+    tx.tick = currentTick + 20;
     tx.inputType = procedureIndex;
     tx.inputSize = inputData.length;
     tx.payload = payload;
@@ -71,59 +86,52 @@ export const buildTransaction = async (
     return tx;
 };
 
-// ---------------------------------------------------------------------------
-// Signing with MetaMask Snap (unchanged)
-// ---------------------------------------------------------------------------
-export const signWithSnap = async (tx: QubicTransaction): Promise<void> => {
-    if (typeof window === 'undefined' || !window.ethereum) {
-        throw new Error('MetaMask not found');
-    }
-
-    const SNAP_ID = 'npm:@qubic-lib/qubic-mm-snap';
-
-    const sourcePubkeyBytes = Array.from((tx.sourcePublicKey as any).getPackageData());
-    const destPubkeyBytes = Array.from((tx.destinationPublicKey as any).getPackageData());
-
-    const txData = {
-        sourcePublicKey: sourcePubkeyBytes,
-        destinationPublicKey: destPubkeyBytes,
-        amount: tx.amount.toString(),
-        tick: tx.tick,
-        inputType: tx.inputType,
-        inputSize: tx.inputSize,
-        payload: Array.from(tx.payload.getPackageData()),
-    };
-
-    const signatureHex = await (window.ethereum as any).request({
-        method: 'wallet_invokeSnap',
-        params: {
-            snapId: SNAP_ID,
-            request: {
-                method: 'signTransaction',
-                params: { transaction: txData },
-            },
-        },
-    }) as string;
-
-    const signatureBytes = new Uint8Array(
-        signatureHex.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
-    );
-    tx.signature = new Signature(signatureBytes);
-};
 
 // ---------------------------------------------------------------------------
-// Broadcast transaction via direct connector
+// Broadcast transaction via API route (which uses server-side connector)
 // ---------------------------------------------------------------------------
 export const broadcastTransactionViaNode = async (tx: QubicTransaction): Promise<string> => {
     try {
-        await ensureConnected();
-        const txData = tx.getPackageData();
-        const txId = await broadcastTransaction(txData);
-        console.log('Transaction broadcast successfully');
-        console.log('Target tick:', tx.tick);
-        return txId;
+        const txData = Array.from(tx.getPackageData());
+
+        console.log('[Transaction] Broadcasting transaction...');
+        console.log('[Transaction] Source:', tx.sourcePublicKey);
+        console.log('[Transaction] Destination:', tx.destinationPublicKey);
+        console.log('[Transaction] Tick:', tx.tick);
+        console.log('[Transaction] Input Type:', tx.inputType);
+        console.log('[Transaction] Input Size:', tx.inputSize);
+        console.log('[Transaction] Package data length:', txData.length);
+        console.log('[Transaction] Signature present:', tx.signature ? 'Yes' : 'No');
+        if (tx.signature) {
+            const sigBytes = (tx.signature as any).bytes;
+            console.log('[Transaction] Signature length:', sigBytes?.length || 'unknown');
+            if (sigBytes) {
+                console.log('[Transaction] Signature (first 32 bytes):', Array.from(sigBytes.slice(0, 32)));
+            }
+        }
+        console.log('[Transaction] First 100 bytes of package:', Array.from(txData.slice(0, 100)));
+
+        const response = await fetch('/api/broadcast', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ txData }),
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to broadcast transaction');
+        }
+
+        console.log('[Transaction] Broadcast successful');
+        console.log('[Transaction] Target tick:', tx.tick);
+        console.log('[Transaction] Transaction ID:', data.txId);
+
+        return data.txId;
     } catch (error) {
-        console.error('Error broadcasting transaction:', error);
+        console.error('[Transaction] Error broadcasting:', error);
         throw error;
     }
 };

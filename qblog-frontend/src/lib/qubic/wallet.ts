@@ -6,9 +6,8 @@ import cryptoPromise from '@qubic-lib/qubic-ts-library/dist/crypto';
 export interface WalletKeys {
     publicKey: Uint8Array;
     identity: string;
-    seed?: string;
-    privateKey?: Uint8Array;
-    type: 'seed' | 'snap';
+    seed: string;
+    privateKey: Uint8Array;
 }
 
 /**
@@ -54,7 +53,6 @@ export const generateKeysFromSeed = async (seed: string): Promise<WalletKeys | n
             privateKey,
             identity,
             seed,
-            type: 'seed'
         };
     } catch (error) {
         console.error('Error generating keys from seed:', error);
@@ -72,25 +70,40 @@ export const isValidIdentity = (identity: string): boolean => {
 /**
  * Truncate identity for display
  */
+/**
+ * Truncate identity for display
+ */
 export const truncateIdentity = (identity: string, chars: number = 8): string => {
     if (identity.length <= chars * 2) return identity;
     return `${identity.slice(0, chars)}...${identity.slice(-chars)}`;
 };
 
 /**
+ * Convert identity to public key bytes
+*/
+export const identityToPublicKey = (identity: string): Uint8Array => {
+    if (!isValidIdentity(identity)) {
+        throw new Error('Invalid identity format');
+    }
+
+    const qubicHelper = new QubicHelper();
+    const bytes = qubicHelper.getIdentityBytes(identity)
+
+    // Return first 32 bytes (public key)
+    return bytes.slice(0, 32);
+};
+
+/**
  * Store wallet in session storage (not recommended for production)
+ * Just for testing purpose
  */
 export const storeWallet = (keys: WalletKeys): void => {
     if (typeof window !== 'undefined') {
-        const storageData: any = {
+        const storageData = {
             identity: keys.identity,
-            type: keys.type,
-            publicKey: Array.from(keys.publicKey), // Store public key as array
+            publicKey: Array.from(keys.publicKey),
+            seed: keys.seed,
         };
-
-        if (keys.type === 'seed' && keys.seed) {
-            storageData.seed = keys.seed;
-        }
 
         sessionStorage.setItem('qubic_wallet', JSON.stringify(storageData));
     }
@@ -108,15 +121,8 @@ export const retrieveWallet = async (): Promise<WalletKeys | null> => {
         if (stored) {
             try {
                 const data = JSON.parse(stored);
-
-                if (data.type === 'seed' && data.seed) {
+                if (data.seed) {
                     return await generateKeysFromSeed(data.seed);
-                } else if (data.type === 'snap') {
-                    return {
-                        identity: data.identity,
-                        publicKey: new Uint8Array(data.publicKey),
-                        type: 'snap',
-                    };
                 }
             } catch (e) {
                 console.error('Error retrieving wallet:', e);
@@ -136,121 +142,3 @@ export const clearWallet = (): void => {
     }
 };
 
-/**
- * Connect to MetaMask Snap and get public key
- */
-export const connectMetaMaskSnap = async (): Promise<WalletKeys | null> => {
-    try {
-        if (typeof window === 'undefined' || !window.ethereum) {
-            throw new Error('MetaMask not installed');
-        }
-
-        const SNAP_ID = 'npm:@qubic-lib/qubic-mm-snap';
-
-        // First check if Snaps are supported at all
-        let snaps: any;
-        try {
-            snaps = await window.ethereum.request({
-                method: 'wallet_getSnaps',
-            });
-        } catch (snapCheckError: any) {
-            if (snapCheckError.code === -32601 || snapCheckError.code === 4200) {
-                throw new Error('MetaMask Snaps not supported. Please install MetaMask Flask from https://metamask.io/flask/');
-            }
-            throw snapCheckError;
-        }
-
-        // Check if our Snap is already installed
-        const isInstalled = snaps && Object.keys(snaps).includes(SNAP_ID);
-
-        // Request Snap connection/installation if not installed
-        if (!isInstalled) {
-            try {
-                await window.ethereum.request({
-                    method: 'wallet_requestSnaps',
-                    params: {
-                        [SNAP_ID]: {},
-                    },
-                });
-            } catch (snapError: any) {
-                if (snapError.code === -32601 || snapError.code === 4200) {
-                    throw new Error('MetaMask Snaps not supported. Please install MetaMask Flask.');
-                }
-                if (snapError.code === 4001) {
-                    throw new Error('User rejected Snap installation');
-                }
-                throw snapError;
-            }
-        }
-
-        // Get public key from Snap
-        const response: any = await window.ethereum.request({
-            method: 'wallet_invokeSnap',
-            params: {
-                snapId: SNAP_ID,
-                request: {
-                    method: 'getPublicKey',
-                },
-            },
-        });
-
-        if (!response || !response.publicKey) {
-            throw new Error('Failed to get public key from Snap');
-        }
-
-        // Convert public key to Uint8Array
-        let publicKeyBytes: Uint8Array;
-        if (typeof response.publicKey === 'string') {
-            const pkHex = response.publicKey.startsWith('0x')
-                ? response.publicKey.slice(2)
-                : response.publicKey;
-            publicKeyBytes = new Uint8Array(
-                pkHex.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16))
-            );
-        } else if (Array.isArray(response.publicKey)) {
-            publicKeyBytes = new Uint8Array(response.publicKey);
-        } else {
-            publicKeyBytes = new Uint8Array(response.publicKey);
-        }
-
-        // Get identity from public key
-        const qubicHelper = new QubicHelper();
-        const identity = await qubicHelper.getIdentity(publicKeyBytes);
-
-        return {
-            publicKey: publicKeyBytes,
-            identity,
-            type: 'snap',
-        };
-    } catch (error: any) {
-        console.error('Error connecting to MetaMask Snap:', error);
-        // Provide more helpful error messages
-        if (error.code === -32601 || error.code === 4200) {
-            throw new Error('MetaMask Snaps not supported. Please use MetaMask Flask or connect with Seed Phrase instead.');
-        }
-        if (error.code === 4001) {
-            throw new Error('User rejected the connection request');
-        }
-        throw error;
-    }
-};
-
-/**
- * Check if MetaMask Snap is installed
- */
-export const isSnapInstalled = async (): Promise<boolean> => {
-    try {
-        if (typeof window === 'undefined' || !window.ethereum) {
-            return false;
-        }
-
-        const SNAP_ID = 'npm:@qubic-lib/qubic-mm-snap';
-        const snaps = await window.ethereum.request({
-            method: 'wallet_getSnaps',
-        });
-
-        return Object.keys(snaps).includes(SNAP_ID);
-    } catch {
-        return false;
-    }
-};

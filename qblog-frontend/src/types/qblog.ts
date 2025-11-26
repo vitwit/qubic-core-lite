@@ -17,6 +17,8 @@ export interface CreatePostInput {
 export interface CreatePostOutput {
     postId: number;
     returnCode: number;
+    txId?: string;
+    targetTick?: number;
 }
 
 export interface EditPostInput {

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Heart, Edit, Trash2, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useWallet } from '@/contexts/WalletContext';
-import { getPost, likePost, deletePost } from '@/lib/qubic/qblog-api';
+import { likePost, deletePost, getPost } from '@/lib/qubic/qblog-api';
 import { PostWithId } from '@/types/qblog';
 import { formatDate, stringToColor, getInitials } from '@/utils/format';
 import { truncateIdentity } from '@/lib/qubic/wallet';
@@ -28,17 +28,13 @@ export default function PostDetailPage() {
 
     const loadPost = async () => {
         try {
-            // Mock data for now
-            const mockPost: PostWithId = {
-                id: postId,
-                author: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-                timestamp: Math.floor(Date.now() / 1000) - 3600,
-                likes: 42,
-                deleted: false,
-                title: 'Welcome to QBlog!',
-                content: 'This is a decentralized blogging platform built on Qubic blockchain. Create, share, and engage with content in a truly decentralized way. Your posts are stored permanently on the blockchain, ensuring censorship resistance and true ownership of your content.',
-            };
-            setPost(mockPost);
+            const { post: fetchedPost, exists } = await getPost(postId);
+
+            if (exists) {
+                setPost({ ...fetchedPost, id: postId });
+            } else {
+                setPost(null);
+            }
         } catch (error) {
             console.error('Error loading post:', error);
         } finally {

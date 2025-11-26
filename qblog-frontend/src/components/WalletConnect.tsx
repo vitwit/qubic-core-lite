@@ -10,12 +10,7 @@ interface WalletConnectProps {
     onClose: () => void;
 }
 
-type Tab = 'snap' | 'seed';
-
-const SNAP_ID = 'npm:@qubic-lib/qubic-mm-snap';
-
 export const WalletConnect = ({ isOpen, onClose }: WalletConnectProps) => {
-    const [activeTab, setActiveTab] = useState<Tab>('snap');
     const [seed, setSeed] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -41,50 +36,6 @@ export const WalletConnect = ({ isOpen, onClose }: WalletConnectProps) => {
         }
     };
 
-    const handleConnectSnap = async () => {
-        setError('');
-        setLoading(true);
-        try {
-            // Check if MetaMask is installed
-            if (!window.ethereum) {
-                throw new Error('MetaMask is not installed. Please install MetaMask to continue.');
-            }
-
-            // Check if Snaps are supported
-            try {
-                const snaps = await window.ethereum.request({
-                    method: 'wallet_getSnaps',
-                });
-                // If we get here, Snaps are supported
-            } catch (snapCheckError: any) {
-                if (snapCheckError.code === -32601) {
-                    throw new Error('MetaMask Snaps are not supported. Please install MetaMask Flask from https://metamask.io/flask/');
-                }
-            }
-
-            // Use the connectMetaMaskSnap function from wallet.ts
-            const { connectMetaMaskSnap } = await import('@/lib/qubic/wallet');
-            const walletKeys = await connectMetaMaskSnap();
-
-            if (!walletKeys) {
-                throw new Error('Failed to connect to MetaMask Snap');
-            }
-
-            connectWallet({
-                identity: walletKeys.identity,
-                publicKey: walletKeys.publicKey,
-                type: 'snap',
-            });
-
-            onClose();
-
-        } catch (err: any) {
-            console.error('Snap connection error:', err);
-            setError(err.message || 'Failed to connect to MetaMask Snap. Make sure MetaMask Flask is installed.');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     if (!isOpen) return null;
 
@@ -102,116 +53,56 @@ export const WalletConnect = ({ isOpen, onClose }: WalletConnectProps) => {
                     </button>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex p-2 gap-2 bg-white/[0.02]">
-                    <button
-                        onClick={() => setActiveTab('snap')}
-                        className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all ${activeTab === 'snap'
-                            ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20'
-                            : 'text-gray-400 hover:text-white hover:bg-white/[0.05]'
-                            }`}
-                    >
-                        <div className="flex items-center justify-center space-x-2">
-                            <Wallet size={16} />
-                            <span>MetaMask Snap</span>
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('seed')}
-                        className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all ${activeTab === 'seed'
-                            ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20'
-                            : 'text-gray-400 hover:text-white hover:bg-white/[0.05]'
-                            }`}
-                    >
-                        <div className="flex items-center justify-center space-x-2">
-                            <Key size={16} />
-                            <span>Seed Phrase</span>
-                        </div>
-                    </button>
-                </div>
 
-                {/* Content */}
                 <div className="p-6">
-                    {activeTab === 'snap' ? (
-                        <div className="space-y-6">
-                            <div className="text-center space-y-4">
-                                <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-10 h-10" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold text-white mb-2">Qubic Wallet Snap</h3>
-                                    <p className="text-sm text-gray-400">
-                                        Connect securely using the official Qubic MetaMask Snap.
-                                        Requires MetaMask Flask.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleConnectSnap}
-                                disabled={loading}
-                                className="w-full btn-primary flex items-center justify-center space-x-2 py-3"
-                            >
-                                {loading ? (
-                                    <LoadingSpinner size="sm" />
-                                ) : (
-                                    <>
-                                        <span>Connect with MetaMask</span>
-                                        <ArrowRight size={18} />
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    ) : (
-                        <form onSubmit={handleConnectSeed} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
-                                    Seed Phrase
-                                </label>
-                                <textarea
-                                    value={seed}
-                                    onChange={(e) => setSeed(e.target.value)}
-                                    placeholder="Enter your 55-character seed phrase..."
-                                    className="input-field min-h-[100px] font-mono text-sm resize-none"
-                                    maxLength={55}
-                                    required
-                                />
-                                <div className="flex justify-between mt-2">
-                                    <p className="text-xs text-gray-500">
-                                        {seed.length}/55 characters
-                                    </p>
-                                    {seed.length === 55 && (
-                                        <span className="text-xs text-green-400 flex items-center">
-                                            <CheckCircle2 size={12} className="mr-1" /> Valid length
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex items-start space-x-3">
-                                <AlertTriangle size={18} className="text-yellow-500 shrink-0 mt-0.5" />
-                                <p className="text-xs text-yellow-200/80 leading-relaxed">
-                                    <strong>Security Warning:</strong> Never share your seed phrase.
-                                    This interface runs locally in your browser.
+                    <form onSubmit={handleConnectSeed} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Seed Phrase
+                            </label>
+                            <textarea
+                                value={seed}
+                                onChange={(e) => setSeed(e.target.value)}
+                                placeholder="Enter your 55-character seed phrase..."
+                                className="input-field min-h-[100px] font-mono text-sm resize-none"
+                                maxLength={55}
+                                required
+                            />
+                            <div className="flex justify-between mt-2">
+                                <p className="text-xs text-gray-500">
+                                    {seed.length}/55 characters
                                 </p>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={loading || seed.length !== 55}
-                                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 py-3"
-                            >
-                                {loading ? (
-                                    <>
-                                        <LoadingSpinner size="sm" />
-                                        <span>Connecting...</span>
-                                    </>
-                                ) : (
-                                    <span>Connect Wallet</span>
+                                {seed.length === 55 && (
+                                    <span className="text-xs text-green-400 flex items-center">
+                                        <CheckCircle2 size={12} className="mr-1" /> Valid length
+                                    </span>
                                 )}
-                            </button>
-                        </form>
-                    )}
+                            </div>
+                        </div>
+
+                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex items-start space-x-3">
+                            <AlertTriangle size={18} className="text-yellow-500 shrink-0 mt-0.5" />
+                            <p className="text-xs text-yellow-200/80 leading-relaxed">
+                                <strong>Security Warning:</strong> Never share your seed phrase.
+                                This interface runs locally in your browser.
+                            </p>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading || seed.length !== 55}
+                            className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 py-3"
+                        >
+                            {loading ? (
+                                <>
+                                    <LoadingSpinner size="sm" />
+                                    <span>Connecting...</span>
+                                </>
+                            ) : (
+                                <span>Connect Wallet</span>
+                            )}
+                        </button>
+                    </form>
 
                     {error && (
                         <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl p-4 animate-fade-in">
