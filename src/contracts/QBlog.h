@@ -217,7 +217,7 @@ struct QBLOG : public ContractBase
     };
     struct GetPostsByUser_output
     {
-        Array<Post, 10> posts; // Fixed size for simplicity, max 10 per page
+        Array<Post, 16> posts; // Array capacity must be power of 2, max 16 per page
         uint32 count;
         bit hasMore;
     };
@@ -227,7 +227,7 @@ struct QBLOG : public ContractBase
         output.count = 0;
         output.hasMore = false;
         
-        if (input.pageSize == 0 || input.pageSize > 10) input.pageSize = 10;
+        if (input.pageSize == 0 || input.pageSize > 16) input.pageSize = 16;
 
         sint64 currentIdx = state.posts.headIndex(input.author);
         uint32 skipped = 0;
