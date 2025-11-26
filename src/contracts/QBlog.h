@@ -8,8 +8,8 @@ struct Post
     uint64 timestamp;
     uint32 likes;
     bit deleted;
-    char title[64];
-    char content[256];
+    Array<sint8, 64> title;
+    Array<sint8, 256> content;
 };
 
 struct QBLOG2
@@ -25,8 +25,8 @@ struct QBLOG : public ContractBase
     // Create Post
     struct CreatePost_input
     {
-        char title[64];
-        char content[256];
+        Array<sint8, 64> title;
+        Array<sint8, 256> content;
     };
     struct CreatePost_output
     {
@@ -48,11 +48,11 @@ struct QBLOG : public ContractBase
         newPost.likes = 0;
         newPost.deleted = false;
         
-        for (int i = 0; i < 64; ++i) newPost.title[i] = input.title[i];
-        for (int i = 0; i < 256; ++i) newPost.content[i] = input.content[i];
+        newPost.title = input.title;
+        newPost.content = input.content;
 
-        newPost.title[63] = 0;
-        newPost.content[255] = 0;
+        newPost.title.set(63, 0);
+        newPost.content.set(255, 0);
 
         // Add to collection. 
         // PoV = author (allows querying by author)
@@ -73,8 +73,8 @@ struct QBLOG : public ContractBase
     struct EditPost_input
     {
         uint32 postId;
-        char title[64];
-        char content[256];
+        Array<sint8, 64> title;
+        Array<sint8, 256> content;
     };
     struct EditPost_output
     {
@@ -107,11 +107,11 @@ struct QBLOG : public ContractBase
         }
 
         // Update content
-        for (int i = 0; i < 64; ++i) post.title[i] = input.title[i];
-        for (int i = 0; i < 256; ++i) post.content[i] = input.content[i];
+        post.title = input.title;
+        post.content = input.content;
         
-        post.title[63] = 0;
-        post.content[255] = 0;
+        post.title.set(63, 0);
+        post.content.set(255, 0);
 
         state.posts.replace(index, post);
         output.success = true;
@@ -217,7 +217,7 @@ struct QBLOG : public ContractBase
     };
     struct GetPostsByUser_output
     {
-        Post posts[10]; // Fixed size for simplicity, max 10 per page
+        Array<Post, 10> posts; // Fixed size for simplicity, max 10 per page
         uint32 count;
         bit hasMore;
     };
@@ -247,7 +247,7 @@ struct QBLOG : public ContractBase
                 {
                     if (output.count < input.pageSize)
                     {
-                        output.posts[output.count] = p;
+                        output.posts.set(output.count, p);
                         output.count++;
                     }
                     else

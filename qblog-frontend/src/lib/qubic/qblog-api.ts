@@ -32,12 +32,20 @@ const FUNCTION_INDEX = {
 };
 
 // ---------------------------------------------------------------------------
-// Utility: string to fixed‑size byte array
+// Utility: string to fixed‑size byte array (sint8 compatible)
 // ---------------------------------------------------------------------------
+/**
+ * Convert string to byte array compatible with Array<sint8, N> contract types.
+ * UTF-8 encoded text typically uses values 0-127, which are identical in both
+ * uint8 and sint8 representations. Extended ASCII (128-255) will be interpreted
+ * as negative values (-128 to -1) by the contract.
+ */
 function stringToByteArray(str: string, maxLength: number): number[] {
     const encoded = new TextEncoder().encode(str);
     const result = new Array(maxLength).fill(0);
     for (let i = 0; i < Math.min(encoded.length, maxLength); i++) {
+        // Values 0-127 are the same in uint8 and sint8
+        // Values 128-255 will be interpreted as -128 to -1 in sint8
         result[i] = encoded[i];
     }
     return result;
@@ -81,6 +89,7 @@ export async function createPost(
     publicKey: Uint8Array,
     privateKey?: Uint8Array
 ): Promise<CreatePostOutput> {
+    // Convert strings to byte arrays compatible with Array<sint8, N>
     const titleBytes = stringToByteArray(input.title, 64);
     const contentBytes = stringToByteArray(input.content, 256);
     const inputData = new Uint8Array([...titleBytes, ...contentBytes]);
@@ -104,6 +113,7 @@ export async function editPost(
 ): Promise<EditPostOutput> {
     const postIdBytes = new Uint8Array(4);
     new DataView(postIdBytes.buffer).setUint32(0, input.postId, true);
+    // Convert strings to byte arrays compatible with Array<sint8, N>
     const titleBytes = stringToByteArray(input.title, 64);
     const contentBytes = stringToByteArray(input.content, 256);
     const inputData = new Uint8Array([...postIdBytes, ...titleBytes, ...contentBytes]);

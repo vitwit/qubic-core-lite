@@ -21,10 +21,21 @@ public:
         QBLOG::CreatePost_input input;
         QBLOG::CreatePost_output output;
 
-        memset(input.title, 0, 64);
-        memset(input.content, 0, 256);
-        strncpy(input.title, title, 63);
-        strncpy(input.content, content, 255);
+        // Initialize arrays to zero
+        for (int i = 0; i < 64; ++i) input.title.set(i, 0);
+        for (int i = 0; i < 256; ++i) input.content.set(i, 0);
+        
+        // Copy title (max 63 chars to leave room for null terminator)
+        size_t titleLen = strlen(title);
+        for (size_t i = 0; i < titleLen && i < 63; ++i) {
+            input.title.set(i, (sint8)title[i]);
+        }
+        
+        // Copy content (max 255 chars to leave room for null terminator)
+        size_t contentLen = strlen(content);
+        for (size_t i = 0; i < contentLen && i < 255; ++i) {
+            input.content.set(i, (sint8)content[i]);
+        }
 
         invokeUserProcedure(QBLOG_CONTRACT_INDEX, 1, input, output, user, 0, true, expectSuccess);
         return output;
@@ -36,10 +47,22 @@ public:
         QBLOG::EditPost_output output;
 
         input.postId = postId;
-        memset(input.title, 0, 64);
-        memset(input.content, 0, 256);
-        strncpy(input.title, title, 63);
-        strncpy(input.content, content, 255);
+        
+        // Initialize arrays to zero
+        for (int i = 0; i < 64; ++i) input.title.set(i, 0);
+        for (int i = 0; i < 256; ++i) input.content.set(i, 0);
+        
+        // Copy title (max 63 chars to leave room for null terminator)
+        size_t titleLen = strlen(title);
+        for (size_t i = 0; i < titleLen && i < 63; ++i) {
+            input.title.set(i, (sint8)title[i]);
+        }
+        
+        // Copy content (max 255 chars to leave room for null terminator)
+        size_t contentLen = strlen(content);
+        for (size_t i = 0; i < contentLen && i < 255; ++i) {
+            input.content.set(i, (sint8)content[i]);
+        }
 
         invokeUserProcedure(QBLOG_CONTRACT_INDEX, 2, input, output, user, 0, true, expectSuccess);
         return output;
@@ -90,6 +113,23 @@ public:
         callFunction(QBLOG_CONTRACT_INDEX, 6, input, output);
         return output;
     }
+
+    // Helper function to compare Array<sint8, N> with C-string
+    template<int N>
+    bool arrayEquals(const Array<sint8, N>& arr, const char* str)
+    {
+        size_t len = strlen(str);
+        for (size_t i = 0; i < len && i < N; ++i) {
+            if (arr.get(i) != (sint8)str[i]) {
+                return false;
+            }
+        }
+        // Check for null terminator
+        if (len < N) {
+            return arr.get(len) == 0;
+        }
+        return true;
+    }
 };
 
 TEST(TestContractQBlog, testingAllProceduresAndFunctions)
@@ -111,8 +151,8 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
     auto getOut = qblog.getPost(postId);
     EXPECT_TRUE(getOut.exists);
     EXPECT_EQ(getOut.post.author, user1);
-    EXPECT_STREQ(getOut.post.title, "First Post");
-    EXPECT_STREQ(getOut.post.content, "Hello World");
+    EXPECT_TRUE(qblog.arrayEquals(getOut.post.title, "First Post"));
+    EXPECT_TRUE(qblog.arrayEquals(getOut.post.content, "Hello World"));
     EXPECT_EQ(getOut.post.likes, 0);
     EXPECT_FALSE(getOut.post.deleted);
 
@@ -121,15 +161,15 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
     EXPECT_TRUE(editOut.success);
 
     getOut = qblog.getPost(postId);
-    EXPECT_STREQ(getOut.post.title, "Updated Title");
-    EXPECT_STREQ(getOut.post.content, "Updated Content");
+    EXPECT_TRUE(qblog.arrayEquals(getOut.post.title, "Updated Title"));
+    EXPECT_TRUE(qblog.arrayEquals(getOut.post.content, "Updated Content"));
 
     // 3.1 Edit Post (Unauthorized)
     editOut = qblog.editPost(user2, postId, "Hacked", "Hacked");
     EXPECT_FALSE(editOut.success);
 
     getOut = qblog.getPost(postId);
-    EXPECT_STREQ(getOut.post.title, "Updated Title"); // Should remain unchanged
+    EXPECT_TRUE(qblog.arrayEquals(getOut.post.title, "Updated Title")); // Should remain unchanged
 
     // 4. Like Post
     auto likeOut = qblog.likePost(user2, postId);
@@ -145,8 +185,8 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
     
     auto postsOut = qblog.getPostsByUser(user1, 0, 10);
     EXPECT_EQ(postsOut.count, 2);
-    EXPECT_EQ(postsOut.posts[0].author, user1);
-    EXPECT_EQ(postsOut.posts[1].author, user1);
+    EXPECT_EQ(postsOut.posts.get(0).author, user1);
+    EXPECT_EQ(postsOut.posts.get(1).author, user1);
 
     // 6. Delete Post
     auto deleteOut = qblog.deletePost(user1, postId);
@@ -164,5 +204,5 @@ TEST(TestContractQBlog, testingAllProceduresAndFunctions)
     // 7. Verify GetPostsByUser skips deleted
     postsOut = qblog.getPostsByUser(user1, 0, 10);
     EXPECT_EQ(postsOut.count, 1); // Only "Second Post" should be returned
-    EXPECT_STREQ(postsOut.posts[0].title, "Second Post");
+    EXPECT_TRUE(qblog.arrayEquals(postsOut.posts.get(0).title, "Second Post"));
 }

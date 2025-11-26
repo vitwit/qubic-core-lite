@@ -33,7 +33,7 @@ def load_env():
     return env_vars
 
 def text_to_byte_array(text, max_length):
-    """Convert text string to qubic-cli byte array format"""
+    """Convert text string to qubic-cli sint8 array format"""
     # Convert to bytes and pad with zeros
     text_bytes = text.encode('utf-8')[:max_length]
     
@@ -41,9 +41,14 @@ def text_to_byte_array(text, max_length):
     byte_list = []
     for i in range(max_length):
         if i < len(text_bytes):
-            byte_list.append(f"{text_bytes[i]}uint8")
+            # Convert to signed int8 (-128 to 127)
+            # Values 0-127 stay the same, 128-255 become negative
+            val = text_bytes[i]
+            if val > 127:
+                val = val - 256
+            byte_list.append(f"{val}sint8")
         else:
-            byte_list.append("0uint8")
+            byte_list.append("0sint8")
     
     return f"[{max_length};{','.join(byte_list)}]"
 
@@ -104,7 +109,7 @@ def like_post_command(cli_path, node_ip, node_port, seed, post_id, contract_inde
 def get_post_command(cli_path, node_ip, node_port, post_id, contract_index):
     """Generate GetPost command"""
     input_format = f'{{ {post_id}uint32 }}'
-    output_format = '{ { id, uint64, uint32, uint8, [64;uint8], [256;uint8] } }'
+    output_format = '{ { id, uint64, uint32, uint8, [64;sint8], [256;sint8] } }'
     
     cmd = f"""{cli_path} -enabletestcontracts -nodeip {node_ip} -nodeport {node_port} \\
   -callcontractfunction {contract_index} 5 \\
@@ -116,7 +121,7 @@ def get_post_command(cli_path, node_ip, node_port, post_id, contract_index):
 def get_posts_by_user_command(cli_path, node_ip, node_port, author_id, page, page_size, contract_index):
     """Generate GetPostsByUser command"""
     input_format = f'{{ {author_id}id, {page}uint32, {page_size}uint32 }}'
-    output_format = '{ [10;{ id, uint64, uint32, uint8, [64;uint8], [256;uint8] }], uint32, uint8 }'
+    output_format = '{ [10;{ id, uint64, uint32, uint8, [64;sint8], [256;sint8] }], uint32, uint8 }'
     
     cmd = f"""{cli_path} -enabletestcontracts -nodeip {node_ip} -nodeport {node_port} \\
   -callcontractfunction {contract_index} 6 \\
