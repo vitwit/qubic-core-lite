@@ -58,7 +58,7 @@ Edit `.env.local` with your settings:
 
 ```env
 NEXT_PUBLIC_QUBIC_RPC_URL=http://127.0.0.1:21841
-NEXT_PUBLIC_QBLOG_CONTRACT_INDEX=20
+NEXT_PUBLIC_QBLOG_CONTRACT_INDEX=19
 NEXT_PUBLIC_NETWORK=testnet
 ```
 
@@ -154,7 +154,7 @@ The project uses a custom Tailwind configuration with:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NEXT_PUBLIC_QUBIC_RPC_URL` | Qubic node RPC endpoint | `http://127.0.0.1:21841` |
-| `NEXT_PUBLIC_QBLOG_CONTRACT_INDEX` | QBlog contract index | `20` |
+| `NEXT_PUBLIC_QBLOG_CONTRACT_INDEX` | QBlog contract index | `19` |
 | `NEXT_PUBLIC_NETWORK` | Network type | `testnet` |
 
 ## Security Notes

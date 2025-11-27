@@ -21,7 +21,7 @@ import type {
 } from '@/types/qblog';
 
 // Configuration
-const CONTRACT_INDEX = parseInt(process.env.NEXT_PUBLIC_QBLOG_CONTRACT_INDEX || '20');
+const CONTRACT_INDEX = parseInt(process.env.NEXT_PUBLIC_QBLOG_CONTRACT_INDEX || '19');
 
 const FUNCTION_INDEX = {
     CREATE_POST: 1,

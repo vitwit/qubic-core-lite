@@ -39,7 +39,7 @@ export async function getCurrentTick(): Promise<number> {
 // ---------------------------------------------------------------------------
 // Transaction builder
 // ---------------------------------------------------------------------------
-export const CONTRACT_INDEX = parseInt(process.env.NEXT_PUBLIC_QBLOG_CONTRACT_INDEX || '20');
+export const CONTRACT_INDEX = parseInt(process.env.NEXT_PUBLIC_QBLOG_CONTRACT_INDEX || '19');
 
 export interface TransactionParams {
     sourcePublicKey: Uint8Array;

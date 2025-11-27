@@ -31,7 +31,7 @@ Update the following values in `.env`:
 ```bash
 QUBIC_NODE_IP=127.0.0.1              # Your Qubic node IP
 QUBIC_NODE_PORT=21841                # Node port
-QBLOG_CONTRACT_INDEX=20              # QBlog contract index (from contract_def.h)
+QBLOG_CONTRACT_INDEX=19              # QBlog contract index (from contract_def.h)
 QUBIC_SEED=your_55_char_seed_here    # Your 55-character seed
 QUBIC_CLI_PATH=./qubic-cli           # Path to qubic-cli binary
 DEFAULT_INVOCATION_REWARD=1000000    # Default transaction reward

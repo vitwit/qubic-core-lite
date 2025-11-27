@@ -29,7 +29,7 @@ Edit `.env.local`:
 # Qubic Node Connection (server-side only)
 QUBIC_NODE_IP=127.0.0.1
 QUBIC_NODE_PORT=21841
-QBLOG_CONTRACT_INDEX=20
+QBLOG_CONTRACT_INDEX=19
 ```
 
 **Important**: These are NOT prefixed with `NEXT_PUBLIC_` because they're server-side only.
