@@ -130,6 +130,169 @@ def get_posts_by_user_command(cli_path, node_ip, node_port, author_id, page, pag
 """
     return cmd
 
+def byte_array_to_string(byte_array):
+    """Convert array of sint8 values to string"""
+    try:
+        # Filter out zeros and convert to characters
+        chars = []
+        for val in byte_array:
+            if val == 0:
+                break
+            # Handle negative values (sint8 range is -128 to 127)
+            if val < 0:
+                val = val + 256
+            chars.append(chr(val))
+        return ''.join(chars)
+    except:
+        return ""
+
+def parse_posts_output(output):
+    """Parse GetPostsByUser output and format it nicely"""
+    import re
+    import json
+    
+    # Try to extract the JSON-like structure from the output
+    match = re.search(r'Contract Function Output.*?\n(.*)', output, re.DOTALL)
+    if not match:
+        return None
+    
+    raw_output = match.group(1).strip()
+    
+    # Parse posts from the raw output
+    posts = []
+    
+    # Look for post structures in the output
+    # Pattern: author_id, timestamp, likes, deleted, [title bytes], [content bytes]
+    post_pattern = r'([A-Z]{60}),\s*(\d+),\s*(\d+),\s*(\d+),\s*\[\s*([\d,\s]+)\s*\],\s*\[\s*([\d,\s]+)\s*\]'
+    
+    for match in re.finditer(post_pattern, raw_output):
+        author = match.group(1)
+        timestamp = int(match.group(2))
+        likes = int(match.group(3))
+        deleted = int(match.group(4))
+        
+        # Parse title bytes
+        title_bytes = [int(x.strip()) for x in match.group(5).split(',') if x.strip()]
+        title = byte_array_to_string(title_bytes)
+        
+        # Parse content bytes
+        content_bytes = [int(x.strip()) for x in match.group(6).split(',') if x.strip()]
+        content = byte_array_to_string(content_bytes)
+        
+        posts.append({
+            'author': author,
+            'timestamp': timestamp,
+            'likes': likes,
+            'deleted': bool(deleted),
+            'title': title,
+            'content': content
+        })
+    
+    # Extract count and hasMore
+    count_match = re.search(r'},\s*(\d+),\s*(\d+)\s*}', raw_output)
+    count = int(count_match.group(1)) if count_match else len(posts)
+    has_more = bool(int(count_match.group(2))) if count_match else False
+    
+    return {
+        'posts': posts,
+        'count': count,
+        'hasMore': has_more
+    }
+
+def format_posts_output(parsed_data):
+    """Format parsed posts data for display"""
+    if not parsed_data or not parsed_data['posts']:
+        return "\n📭 No posts found.\n"
+    
+    output = []
+    output.append("\n" + "="*70)
+    output.append(f"📝 Found {parsed_data['count']} post(s)")
+    if parsed_data['hasMore']:
+        output.append("   (More posts available - use pagination)")
+    output.append("="*70)
+    
+    for i, post in enumerate(parsed_data['posts'], 1):
+        output.append(f"\n📄 Post #{i}")
+        output.append(f"   Author:    {post['author'][:20]}...{post['author'][-10:]}")
+        output.append(f"   Timestamp: {post['timestamp']}")
+        output.append(f"   Likes:     ❤️  {post['likes']}")
+        output.append(f"   Status:    {'🗑️  Deleted' if post['deleted'] else '✅ Active'}")
+        output.append(f"   Title:     \"{post['title']}\"")
+        output.append(f"   Content:   \"{post['content']}\"")
+        output.append("-" * 70)
+    
+    return "\n".join(output)
+
+def parse_post_output(output):
+    """Parse GetPost output and format it nicely"""
+    import re
+    
+    # Try to extract the JSON-like structure from the output
+    match = re.search(r'Contract Function Output.*?\n(.*)', output, re.DOTALL)
+    if not match:
+        return None
+    
+    raw_output = match.group(1).strip()
+    
+    # Pattern for single post: { { author, timestamp, likes, deleted, [title], [content] } }
+    # Note: The actual output has nested braces but no exists field at the end
+    post_pattern = r'\{\s*\{\s*([A-Z]{60}),\s*(\d+),\s*(\d+),\s*(\d+),\s*\[\s*([\d,\s]+)\s*\],\s*\[\s*([\d,\s]+)\s*\]\s*\}\s*\}'
+    
+    match = re.search(post_pattern, raw_output)
+    if not match:
+        return None
+    
+    author = match.group(1)
+    timestamp = int(match.group(2))
+    likes = int(match.group(3))
+    deleted = int(match.group(4))
+    
+    # Parse title bytes
+    title_bytes = [int(x.strip()) for x in match.group(5).split(',') if x.strip()]
+    title = byte_array_to_string(title_bytes)
+    
+    # Parse content bytes
+    content_bytes = [int(x.strip()) for x in match.group(6).split(',') if x.strip()]
+    content = byte_array_to_string(content_bytes)
+    
+    # Check if post exists (if timestamp is 0 and author is all zeros, it doesn't exist)
+    exists = timestamp > 0 or author != 'A' * 60
+    
+    if not exists:
+        return {'exists': False}
+    
+    return {
+        'exists': True,
+        'post': {
+            'author': author,
+            'timestamp': timestamp,
+            'likes': likes,
+            'deleted': bool(deleted),
+            'title': title,
+            'content': content
+        }
+    }
+
+def format_post_output(parsed_data):
+    """Format parsed single post data for display"""
+    if not parsed_data or not parsed_data.get('exists'):
+        return "\n❌ Post not found or doesn't exist.\n"
+    
+    post = parsed_data['post']
+    output = []
+    output.append("\n" + "="*70)
+    output.append("📄 Post Details")
+    output.append("="*70)
+    output.append(f"   Author:    {post['author'][:20]}...{post['author'][-10:]}")
+    output.append(f"   Timestamp: {post['timestamp']}")
+    output.append(f"   Likes:     ❤️  {post['likes']}")
+    output.append(f"   Status:    {'🗑️  Deleted' if post['deleted'] else '✅ Active'}")
+    output.append(f"   Title:     \"{post['title']}\"")
+    output.append(f"   Content:   \"{post['content']}\"")
+    output.append("="*70)
+    
+    return "\n".join(output)
+
 def decode_return_code(code):
     """Decode QBlog return code to human-readable message"""
     codes = {
@@ -147,6 +310,10 @@ def execute_command(cmd_string):
     # Remove line continuations and extra whitespace
     cmd_string = cmd_string.replace('\\\n', ' ').strip()
     
+    # Check if this is a GetPost or GetPostsByUser command
+    is_get_post = '-callcontractfunction' in cmd_string and ' 5 ' in cmd_string
+    is_get_posts = '-callcontractfunction' in cmd_string and ' 6 ' in cmd_string
+    
     print(f"\n{'='*60}")
     print("Executing command:")
     print(cmd_string)
@@ -162,13 +329,31 @@ def execute_command(cmd_string):
             timeout=30
         )
         
-        print("Output:")
         if result.stdout:
-            print(result.stdout)
+            # Parse and format based on command type
+            if 'Contract Function Output' in result.stdout:
+                print("Raw Output:")
+                print(result.stdout)
+                
+                if is_get_posts:
+                    # Parse and display GetPostsByUser output
+                    parsed = parse_posts_output(result.stdout)
+                    if parsed:
+                        formatted = format_posts_output(parsed)
+                        print(formatted)
+                elif is_get_post:
+                    # Parse and display GetPost output
+                    parsed = parse_post_output(result.stdout)
+                    if parsed:
+                        formatted = format_post_output(parsed)
+                        print(formatted)
+            else:
+                # For other commands, just print the output
+                print("Output:")
+                print(result.stdout)
             
             # Try to parse and display return code if present
             import re
-            # Look for returnCode in the output (format may vary)
             return_code_match = re.search(r'returnCode["\s:]*(\d+)', result.stdout)
             if return_code_match:
                 code = int(return_code_match.group(1))
@@ -190,7 +375,6 @@ def execute_command(cmd_string):
     except Exception as e:
         print(f"Error executing command: {e}")
         return False
-
 def main():
     # Load environment variables
     env = load_env()

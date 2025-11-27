@@ -23,16 +23,11 @@ export async function getCurrentTick(): Promise<number> {
         }
 
         // Fallback to timestamp-based calculation if API fails
-        console.warn('Failed to get tick from API, using fallback');
-        const QUBIC_EPOCH = new Date('2024-04-03T12:00:00Z').getTime();
-        const now = Date.now();
-        return Math.floor((now - QUBIC_EPOCH) / 1000);
+        console.warn('Failed to get tick from API');
+        throw new Error('Failed to retrieve current network tick. Please check node connection.');
     } catch (error) {
         console.error('Error getting current tick:', error);
-        // Fallback to timestamp-based calculation
-        const QUBIC_EPOCH = new Date('2024-04-03T12:00:00Z').getTime();
-        const now = Date.now();
-        return Math.floor((now - QUBIC_EPOCH) / 1000);
+        throw new Error('Failed to retrieve current network tick. Please check node connection.');
     }
 }
 

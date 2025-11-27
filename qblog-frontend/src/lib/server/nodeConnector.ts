@@ -41,6 +41,13 @@ class ServerNodeConnector {
                     const size = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16);
                     const type = data[offset + 3];
 
+                    if (size < 8) {
+                        console.error(`[NodeConnector] Invalid packet size: ${size}. Minimum is 8. Disconnecting.`);
+                        socket.destroy();
+                        reject(new Error('Received invalid packet from node'));
+                        return;
+                    }
+
                     if (data.length - offset < size) break;
 
                     if (type === RESPOND_CURRENT_TICK_INFO) {
@@ -52,6 +59,12 @@ class ServerNodeConnector {
                         receivedResponse = true;
                         socket.destroy();
                         resolve({ tick, epoch });
+                        return;
+                    } else if (type === 255) { // Error packet
+                        console.error(`[NodeConnector] Received error packet from node during tick request.`);
+                        receivedResponse = true;
+                        socket.destroy();
+                        reject(new Error('Node returned error (type 255)'));
                         return;
                     }
 
@@ -148,14 +161,26 @@ class ServerNodeConnector {
             });
 
             socket.on('data', (data) => {
+                console.log(`[NodeConnector] Received data: ${data.length} bytes`);
                 let offset = 0;
                 while (offset < data.length) {
                     if (data.length - offset < 8) break;
 
                     const size = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16);
                     const type = data[offset + 3];
+                    console.log(`[NodeConnector] Packet: size=${size}, type=${type}`);
 
-                    if (data.length - offset < size) break;
+                    if (size < 8) {
+                        console.error(`[NodeConnector] Invalid packet size: ${size}. Minimum is 8. Disconnecting.`);
+                        socket.destroy();
+                        reject(new Error('Received invalid packet from node'));
+                        return;
+                    }
+
+                    if (data.length - offset < size) {
+                        console.log(`[NodeConnector] Incomplete packet. Waiting for more data.`);
+                        break;
+                    }
 
                     if (type === RESPOND_CONTRACT_FUNCTION) {
                         const body = data.slice(offset + 8, offset + size);
@@ -163,6 +188,14 @@ class ServerNodeConnector {
                         socket.destroy();
                         resolve(body);
                         return;
+                    } else if (type === 255) { // Error packet
+                        console.error(`[NodeConnector] Received error packet from node.`);
+                        receivedResponse = true;
+                        socket.destroy();
+                        reject(new Error('Node returned error (type 255)'));
+                        return;
+                    } else {
+                        console.log(`[NodeConnector] Unexpected packet type: ${type}. Ignoring.`);
                     }
 
                     offset += size;
