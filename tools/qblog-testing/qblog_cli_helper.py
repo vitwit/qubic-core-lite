@@ -160,12 +160,45 @@ def parse_posts_output(output):
     
     # Parse posts from the raw output
     posts = []
+    # Debug: Write raw output to file
+    with open('debug_output.txt', 'w') as f:
+        f.write(raw_output)
+        
+    # Pattern 1: Nested {{...}, postId}
+    pattern_nested = re.compile(r"""
+        \{\s*\{\s*          # Start of PostWithId and Post
+        ([A-Z]{60})\s*,     # Author
+        \s*(\d+)\s*,        # Timestamp
+        \s*(\d+)\s*,        # Likes
+        \s*(\d+)\s*,        # Deleted
+        \s*\[\s*([\d,\s-]+)\s*\]\s*,  # Title bytes
+        \s*\[\s*([\d,\s-]+)\s*\]\s*   # Content bytes
+        \s*\}\s*,           # End of Post
+        \s*(\d+)\s*         # postId
+        \s*\}               # End of PostWithId
+    """, re.VERBOSE | re.DOTALL)
+
+    # Pattern 2: Flattened {..., postId} (if qubic-cli flattens output)
+    pattern_flattened = re.compile(r"""
+        \{\s*               # Start of PostWithId
+        ([A-Z]{60})\s*,     # Author
+        \s*(\d+)\s*,        # Timestamp
+        \s*(\d+)\s*,        # Likes
+        \s*(\d+)\s*,        # Deleted
+        \s*\[\s*([\d,\s-]+)\s*\]\s*,  # Title bytes
+        \s*\[\s*([\d,\s-]+)\s*\]\s*,  # Content bytes
+        \s*(\d+)\s*         # postId
+        \s*\}               # End of PostWithId
+    """, re.VERBOSE | re.DOTALL)
     
-    # Look for post structures in the output
-    # Pattern: author_id, timestamp, likes, deleted, [title bytes], [content bytes]
-    post_pattern = r'([A-Z]{60}),\s*(\d+),\s*(\d+),\s*(\d+),\s*\[\s*([\d,\s]+)\s*\],\s*\[\s*([\d,\s]+)\s*\]'
-    
-    for match in re.finditer(post_pattern, raw_output):
+    matches = list(pattern_nested.finditer(raw_output))
+    if not matches:
+        matches = list(pattern_flattened.finditer(raw_output))
+        
+    if not matches and "Contract Function Output" in output:
+        print(f"DEBUG: No matches found. Raw output snippet:\n{raw_output[:500]}...")
+        
+    for match in matches:
         author = match.group(1)
         timestamp = int(match.group(2))
         likes = int(match.group(3))
@@ -179,7 +212,11 @@ def parse_posts_output(output):
         content_bytes = [int(x.strip()) for x in match.group(6).split(',') if x.strip()]
         content = byte_array_to_string(content_bytes)
         
+        # Parse postId (group 7)
+        post_id = int(match.group(7))
+        
         posts.append({
+            'postId': post_id,
             'author': author,
             'timestamp': timestamp,
             'likes': likes,
@@ -212,11 +249,13 @@ def format_posts_output(parsed_data):
     output.append("="*70)
     
     for i, post in enumerate(parsed_data['posts'], 1):
-        output.append(f"\n📄 Post #{i}")
+        status = "❌ Deleted" if post['deleted'] else "✅ Active"
+        
+        output.append(f"\n📄 Post #{i} (ID: {post['postId']})")
         output.append(f"   Author:    {post['author'][:20]}...{post['author'][-10:]}")
         output.append(f"   Timestamp: {post['timestamp']}")
         output.append(f"   Likes:     ❤️  {post['likes']}")
-        output.append(f"   Status:    {'🗑️  Deleted' if post['deleted'] else '✅ Active'}")
+        output.append(f"   Status:    {status}")
         output.append(f"   Title:     \"{post['title']}\"")
         output.append(f"   Content:   \"{post['content']}\"")
         output.append("-" * 70)

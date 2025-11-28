@@ -120,9 +120,6 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         const deleted = result[offset] !== 0;
         offset += 1;
 
-        // Skip 3 bytes of padding
-        offset += 3;
-
         const titleBytes = result.slice(offset, offset + 64);
         const title = new TextDecoder().decode(titleBytes).replace(/\0/g, '');
         offset += 64;
@@ -132,8 +129,8 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         offset += 256;
 
         // NOTE: The exists flag in the response is unreliable (always 0 even for valid posts)
-        // Use the contract's validation logic instead: check if author is zero AND timestamp is zero
-        const exists = author !== 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' || timestamp !== 0;
+        // Use the contract's validation logic instead: check if author is NOT zero AND timestamp is NOT zero
+        const exists = author !== 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' && timestamp !== 0;
 
         // Parse userLiked (bit at offset 365)
         const userLiked = result.length > 365 ? result[365] !== 0 : false;
@@ -183,8 +180,9 @@ export async function getPostsByUser(input: GetPostsByUserInput): Promise<GetPos
         let offset = 0;
 
         // Calculate Post Size dynamically
-        // PostWithId = Post (365 bytes) + postId (4 bytes) = 369 bytes
-        // result.length = 16 * 369 + 4 (count) + 1 (hasMore) = 5909 bytes
+        // PostWithId = Post (365 bytes) + postId (4 bytes) + PADDING (7 bytes) = 376 bytes
+        // The C++ compiler adds 7 bytes of padding to align PostWithId to 8-byte boundary
+        // result.length = 16 * 376 + 4 (count) + 1 (hasMore) = 6021 bytes
         const POST_SIZE = Math.floor((result.length - 5) / 16);
         console.log(`Detected POST_SIZE: ${POST_SIZE} bytes`);
 
@@ -221,17 +219,22 @@ export async function getPostsByUser(input: GetPostsByUserInput): Promise<GetPos
             offset += 256;
 
             // Read postId (uint32) after Post struct
-            const pPostId = resultView.getUint32(offset, true);
+            const pPostId = resultView.getUint32(offset, false); // Big-endian!
             offset += 4;
 
             // Advance to next post based on calculated size
-            offset = postStartOffset + POST_SIZE;
+            // The loop condition handles the iteration, but we need to ensure offset is correct
+            // If POST_SIZE > 369, we need to skip the padding
+            // We've already advanced 369 bytes (365 for Post + 4 for postId)
+            // So we need to advance (POST_SIZE - 369) more bytes
+            if (POST_SIZE > 369) {
+                offset += (POST_SIZE - 369);
+            }
+            const isValidTimestamp = pTimestamp > 0 && pTimestamp < 100000000; // Reasonable tick range
+            const isValidAuthor = !pAuthor.startsWith('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA') &&
+                !pAuthor.startsWith('BAAAAAAAAAAAAAAA'); // Filter corrupted authors
 
-            console.log(`[getPostsByUser] Post ${i}: ID=${pPostId}, Author=${pAuthor}, Timestamp=${pTimestamp}`);
-
-            // Only add if not empty (check timestamp or author)
-            // Check for known empty identity pattern or zero timestamp
-            if (pTimestamp !== 0 && !pAuthor.startsWith('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')) {
+            if (isValidTimestamp && isValidAuthor) {
                 posts.push({
                     postId: pPostId,
                     author: pAuthor,
@@ -241,6 +244,8 @@ export async function getPostsByUser(input: GetPostsByUserInput): Promise<GetPos
                     title: pTitle,
                     content: pContent,
                 });
+            } else {
+                console.warn(`[getPostsByUser] Skipping corrupted post: ID=${pPostId}, Author=${pAuthor.substring(0, 20)}..., Timestamp=${pTimestamp}`);
             }
         }
 

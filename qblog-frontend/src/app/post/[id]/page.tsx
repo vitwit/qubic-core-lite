@@ -88,6 +88,26 @@ export default function PostDetailPage() {
         }
     };
 
+    // Poll for transaction status
+    useEffect(() => {
+        if (!txId || !targetTick) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const status = await checkTransactionStatus(txId, targetTick);
+                setTxStatus(formatTransactionStatus(status));
+
+                if (status.status === 'expired') {
+                    clearInterval(interval);
+                }
+            } catch (err) {
+                console.error('Error checking tx status:', err);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [txId, targetTick]);
+
     const handleShare = () => {
         if (typeof window !== 'undefined') {
             navigator.clipboard.writeText(window.location.href);
@@ -136,10 +156,10 @@ export default function PostDetailPage() {
                             )}
                             <div>
                                 <span className="text-xs text-gray-500 uppercase tracking-wider">Status</span>
-                                <p className="text-sm text-yellow-400 flex items-center gap-2">
+                                <div className="text-sm text-yellow-400 flex items-center gap-2">
                                     <LoadingSpinner size="sm" />
                                     {txStatus || 'Broadcasting...'}
-                                </p>
+                                </div>
                             </div>
                         </div>
 

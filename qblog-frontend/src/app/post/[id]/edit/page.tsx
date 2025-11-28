@@ -90,6 +90,27 @@ export default function EditPostPage() {
         }
     };
 
+    // Poll for transaction status
+    useEffect(() => {
+        if (!txId || !targetTick) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const status = await checkTransactionStatus(txId, targetTick);
+                setTxStatus(formatTransactionStatus(status));
+
+                // Stop polling if expired or ready (though we might want to keep polling for 'ready' state confirmation if we had a way to check actual inclusion)
+                if (status.status === 'expired') {
+                    clearInterval(interval);
+                }
+            } catch (err) {
+                console.error('Error checking tx status:', err);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [txId, targetTick]);
+
     if (!isConnected) {
         return (
             <div className="container mx-auto px-4 py-12">
@@ -165,10 +186,10 @@ export default function EditPostPage() {
                             )}
                             <div>
                                 <span className="text-xs text-gray-500 uppercase tracking-wider">Status</span>
-                                <p className="text-sm text-yellow-400 flex items-center gap-2">
+                                <div className="text-sm text-yellow-400 flex items-center gap-2">
                                     <LoadingSpinner size="sm" />
                                     {txStatus || 'Broadcasting...'}
-                                </p>
+                                </div>
                             </div>
                         </div>
 

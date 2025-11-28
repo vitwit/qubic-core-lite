@@ -104,6 +104,7 @@ class ServerNodeConnector {
                 console.log('[NodeConnector] Connected to node at', NODE_IP + ':' + NODE_PORT);
                 console.log('[NodeConnector] Broadcasting transaction...');
                 console.log('[NodeConnector] Transaction data length:', txData.length);
+                console.log('[NodeConnector] Raw Data (Hex):', Buffer.from(txData).toString('hex'));
 
                 const packetSize = 8 + txData.length;
                 const buffer = Buffer.alloc(packetSize);
