@@ -51,7 +51,7 @@ export const buildTransaction = async (
     contractIndex: number,
     procedureIndex: number,
     inputData: Uint8Array,
-    privateKey?: Uint8Array
+    seed?: string
 ): Promise<QubicTransaction> => {
     const currentTick = await getCurrentTick();
 
@@ -73,9 +73,8 @@ export const buildTransaction = async (
     tx.inputSize = inputData.length;
     tx.payload = payload;
 
-    if (privateKey) {
-        const seedString = new TextDecoder().decode(privateKey);
-        await tx.build(seedString);
+    if (seed) {
+        await tx.build(seed);
     }
 
     return tx;

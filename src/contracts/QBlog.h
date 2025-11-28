@@ -19,6 +19,7 @@ struct QBlogLogger {
 
 struct Post
 {
+    uint32 id;
     id author;
     uint64 timestamp;
     uint32 likes;
@@ -36,6 +37,10 @@ struct QBLOG : public ContractBase
     // State variables
     // Using Collection to index posts by author (PoV)
     Collection<Post, 1024> posts;
+    
+    // Track who liked each post to enable like toggling
+    // Key: hash(postId + voterId), Value: 1 if liked
+    HashMap<uint64, uint8, 4096> likedBy;
 
     // Create Post
     struct CreatePost_input
@@ -67,6 +72,7 @@ struct QBLOG : public ContractBase
         }
 
         Post newPost;
+        newPost.id = 0; // Will be set to actual index after add()
         newPost.author = qpi.invocator();
         newPost.timestamp = qpi.tick();
         newPost.likes = 0;
@@ -92,6 +98,10 @@ struct QBLOG : public ContractBase
         }
         else
         {
+             // Update the post with its actual ID and save it back
+             newPost.id = (uint32)index;
+             state.posts.replace(index, newPost);
+             
              output.postId = (uint32)index;
              output.returnCode = static_cast<uint32>(QBlogLogInfo::success);
              locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::success), 0 };
@@ -234,7 +244,27 @@ struct QBLOG : public ContractBase
             return;
         }
 
-        post.likes++;
+        // Create unique key for this user+post combination
+        uint64 voteKey = ((uint64)input.postId << 32) | (qpi.invocator().u64._0 & 0xFFFFFFFF);
+        
+        // Check if user already liked this post
+        uint8 alreadyLiked = 0;
+        if (state.likedBy.get(voteKey, alreadyLiked))
+        {
+            // User already liked - remove the like (toggle off)
+            state.likedBy.removeByKey(voteKey);
+            if (post.likes > 0)
+            {
+                post.likes--;
+            }
+        }
+        else
+        {
+            // User hasn't liked yet - add the like (toggle on)
+            state.likedBy.set(voteKey, 1);
+            post.likes++;
+        }
+        
         state.posts.replace(index, post);
         
         output.newLikeCount = post.likes;
@@ -252,6 +282,7 @@ struct QBLOG : public ContractBase
     {
         Post post;
         bit exists;
+        bit userLiked;  // Whether the requesting user has liked this post
     };
 
     PUBLIC_FUNCTION(GetPost)
@@ -269,6 +300,11 @@ struct QBLOG : public ContractBase
         {
              output.exists = true;
         }
+        
+        // Check if the current user (invocator) has liked this post
+        uint64 voteKey = ((uint64)input.postId << 32) | (qpi.invocator().u64._0 & 0xFFFFFFFF);
+        uint8 liked = 0;
+        output.userLiked = state.likedBy.get(voteKey, liked);
     }
 
     // Get Posts By User
@@ -280,7 +316,7 @@ struct QBLOG : public ContractBase
     };
     struct GetPostsByUser_output
     {
-        Array<Post, 16> posts; // Array capacity must be power of 2, max 16 per page
+        Array<Post, 16> posts; // Posts now include id field
         uint32 count;
         bit hasMore;
     };
@@ -338,5 +374,6 @@ struct QBLOG : public ContractBase
     INITIALIZE()
     {
         state.posts.reset();
+        state.likedBy.reset();
     }
 };

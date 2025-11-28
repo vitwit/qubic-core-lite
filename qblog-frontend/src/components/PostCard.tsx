@@ -6,6 +6,7 @@ import { Heart, Trash2, Edit, User } from 'lucide-react';
 import { PostWithId } from '@/types/qblog';
 import { formatRelativeTime, truncateText, stringToColor, getInitials } from '@/utils/format';
 import { truncateIdentity } from '@/lib/qubic/wallet';
+import { CopyButton } from '@/components/CopyButton';
 
 interface PostCardProps {
     post: PostWithId;
@@ -32,12 +33,15 @@ export const PostCard = ({ post, onLike, onDelete, showActions = true, isOwner =
                     {getInitials(post.author)}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <Link
-                        href={`/profile/${post.author}`}
-                        className="font-semibold text-gray-200 hover:text-violet-400 transition-colors truncate block"
-                    >
-                        {truncateIdentity(post.author, 6)}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href={`/profile/${post.author}`}
+                            className="font-semibold text-gray-200 hover:text-violet-400 transition-colors truncate block"
+                        >
+                            {truncateIdentity(post.author, 6)}
+                        </Link>
+                        <CopyButton text={post.author} iconSize={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                     <p className="text-xs text-gray-500">
                         {formatRelativeTime(post.timestamp)}
                     </p>

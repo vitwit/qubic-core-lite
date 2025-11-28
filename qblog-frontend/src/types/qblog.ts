@@ -1,6 +1,7 @@
 // QBlog Smart Contract Types
 
 export interface Post {
+    id: number; // Post ID from contract
     author: string; // 60-character Qubic identity
     timestamp: number;
     likes: number;
@@ -55,6 +56,7 @@ export interface GetPostInput {
 export interface GetPostOutput {
     post: Post;
     exists: boolean;
+    userLiked?: boolean; // Whether the current user has liked this post
 }
 
 export interface GetPostsByUserInput {
@@ -64,7 +66,7 @@ export interface GetPostsByUserInput {
 }
 
 export interface GetPostsByUserOutput {
-    posts: Post[];
+    posts: Post[]; // Posts now include id field
     count: number;
     hasMore: boolean;
 }

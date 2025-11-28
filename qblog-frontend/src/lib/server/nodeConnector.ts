@@ -22,6 +22,7 @@ class ServerNodeConnector {
             socket.setTimeout(5000);
 
             let receivedResponse = false;
+            let buffer = Buffer.alloc(0);
 
             socket.on('connect', () => {
                 const buffer = Buffer.alloc(8);
@@ -34,12 +35,14 @@ class ServerNodeConnector {
             });
 
             socket.on('data', (data) => {
-                let offset = 0;
-                while (offset < data.length) {
-                    if (data.length - offset < 8) break;
+                buffer = Buffer.concat([buffer, data]);
 
-                    const size = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16);
-                    const type = data[offset + 3];
+                let offset = 0;
+                while (offset < buffer.length) {
+                    if (buffer.length - offset < 8) break;
+
+                    const size = buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16);
+                    const type = buffer[offset + 3];
 
                     if (size < 8) {
                         console.error(`[NodeConnector] Invalid packet size: ${size}. Minimum is 8. Disconnecting.`);
@@ -48,10 +51,10 @@ class ServerNodeConnector {
                         return;
                     }
 
-                    if (data.length - offset < size) break;
+                    if (buffer.length - offset < size) break;
 
                     if (type === RESPOND_CURRENT_TICK_INFO) {
-                        const body = data.slice(offset + 8, offset + size);
+                        const body = buffer.slice(offset + 8, offset + size);
                         const tickDuration = body.readUInt16LE(0);
                         const epoch = body.readUInt16LE(2);
                         const tick = body.readUInt32LE(4);
@@ -66,9 +69,15 @@ class ServerNodeConnector {
                         socket.destroy();
                         reject(new Error('Node returned error (type 255)'));
                         return;
+                    } else if (type === 0) {
+                        // Ignore ExchangePublicPeers
                     }
 
                     offset += size;
+                }
+
+                if (offset > 0) {
+                    buffer = buffer.slice(offset);
                 }
             });
 
@@ -89,6 +98,7 @@ class ServerNodeConnector {
         return new Promise(async (resolve, reject) => {
             const socket = new net.Socket();
             socket.setTimeout(5000);
+            let buffer = Buffer.alloc(0);
 
             socket.on('connect', async () => {
                 console.log('[NodeConnector] Connected to node at', NODE_IP + ':' + NODE_PORT);
@@ -110,11 +120,10 @@ class ServerNodeConnector {
 
                 socket.write(buffer);
 
-                // Compute TxID: K12 hash of first 1024 bytes of transaction
+                // Compute TxID: K12 hash of entire transaction
                 const cryptoLib = await cryptoPromise;
                 const digest = new Uint8Array(32);
-                const txDataForDigest = txData.length > 1024 ? txData.slice(0, 1024) : txData;
-                cryptoLib.K12(txDataForDigest, digest, 32, 0);
+                cryptoLib.K12(txData, digest, 32, 0);
                 const txId = Buffer.from(digest).toString('hex');
 
                 console.log('[NodeConnector] Transaction sent, TxID:', txId);
@@ -123,6 +132,38 @@ class ServerNodeConnector {
                     socket.destroy();
                     resolve(txId);
                 }, 500);
+            });
+
+            socket.on('data', (data) => {
+                buffer = Buffer.concat([buffer, data]);
+
+                let offset = 0;
+                while (offset < buffer.length) {
+                    if (buffer.length - offset < 8) break;
+                    const size = buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16);
+                    const type = buffer[offset + 3];
+
+                    if (size < 8) {
+                        socket.destroy();
+                        reject(new Error('Invalid packet size'));
+                        return;
+                    }
+
+                    if (buffer.length - offset < size) break;
+
+                    if (type === 255) {
+                        console.error('[NodeConnector] Broadcast failed with error 255');
+                        socket.destroy();
+                        reject(new Error('Broadcast failed'));
+                        return;
+                    }
+
+                    offset += size;
+                }
+
+                if (offset > 0) {
+                    buffer = buffer.slice(offset);
+                }
             });
 
             socket.on('error', (err) => {
@@ -139,35 +180,38 @@ class ServerNodeConnector {
             socket.setTimeout(5000);
 
             let receivedResponse = false;
+            let buffer = Buffer.alloc(0);
 
             socket.on('connect', () => {
                 const packetSize = 8 + 4 + 2 + 2 + inputData.length;
-                const buffer = Buffer.alloc(packetSize);
+                const buf = Buffer.alloc(packetSize);
 
-                buffer[0] = packetSize & 0xFF;
-                buffer[1] = (packetSize >> 8) & 0xFF;
-                buffer[2] = (packetSize >> 16) & 0xFF;
-                buffer[3] = REQUEST_CONTRACT_FUNCTION;
+                buf[0] = packetSize & 0xFF;
+                buf[1] = (packetSize >> 8) & 0xFF;
+                buf[2] = (packetSize >> 16) & 0xFF;
+                buf[3] = REQUEST_CONTRACT_FUNCTION;
 
                 const dejavu = Math.floor(Math.random() * 0xFFFFFFFF);
-                buffer.writeUInt32LE(dejavu, 4);
+                buf.writeUInt32LE(dejavu, 4);
 
-                buffer.writeUInt32LE(contractIndex, 8);
-                buffer.writeUInt16LE(inputType, 12);
-                buffer.writeUInt16LE(inputData.length, 14);
-                buffer.set(inputData, 16);
+                buf.writeUInt32LE(contractIndex, 8);
+                buf.writeUInt16LE(inputType, 12);
+                buf.writeUInt16LE(inputData.length, 14);
+                buf.set(inputData, 16);
 
-                socket.write(buffer);
+                socket.write(buf);
             });
 
             socket.on('data', (data) => {
-                console.log(`[NodeConnector] Received data: ${data.length} bytes`);
-                let offset = 0;
-                while (offset < data.length) {
-                    if (data.length - offset < 8) break;
+                console.log(`[NodeConnector] Received chunk: ${data.length} bytes`);
+                buffer = Buffer.concat([buffer, data]);
 
-                    const size = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16);
-                    const type = data[offset + 3];
+                let offset = 0;
+                while (offset < buffer.length) {
+                    if (buffer.length - offset < 8) break;
+
+                    const size = buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16);
+                    const type = buffer[offset + 3];
                     console.log(`[NodeConnector] Packet: size=${size}, type=${type}`);
 
                     if (size < 8) {
@@ -177,13 +221,13 @@ class ServerNodeConnector {
                         return;
                     }
 
-                    if (data.length - offset < size) {
-                        console.log(`[NodeConnector] Incomplete packet. Waiting for more data.`);
+                    if (buffer.length - offset < size) {
+                        console.log(`[NodeConnector] Incomplete packet. Waiting for more data. Need ${size}, have ${buffer.length - offset}`);
                         break;
                     }
 
                     if (type === RESPOND_CONTRACT_FUNCTION) {
-                        const body = data.slice(offset + 8, offset + size);
+                        const body = buffer.slice(offset + 8, offset + size);
                         receivedResponse = true;
                         socket.destroy();
                         resolve(body);
@@ -194,11 +238,18 @@ class ServerNodeConnector {
                         socket.destroy();
                         reject(new Error('Node returned error (type 255)'));
                         return;
+                    } else if (type === 0) { // ExchangePublicPeers
+                        console.log(`[NodeConnector] Received ExchangePublicPeers (type 0). Ignoring.`);
                     } else {
                         console.log(`[NodeConnector] Unexpected packet type: ${type}. Ignoring.`);
                     }
 
                     offset += size;
+                }
+
+                // Remove processed data from buffer
+                if (offset > 0) {
+                    buffer = buffer.slice(offset);
                 }
             });
 

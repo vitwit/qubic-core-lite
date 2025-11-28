@@ -2,32 +2,22 @@
 
 /**
  * Format timestamp to readable date
+ * Note: QBlog stores Qubic tick numbers, not Unix timestamps
  */
-export const formatDate = (timestamp: number): string => {
-    const date = new Date(timestamp * 1000); // Assuming timestamp is in seconds
-    return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
+export const formatDate = (tickNumber: number): string => {
+    // For now, display tick number since we don't have epoch start time
+    // TODO: Convert tick to actual date using epoch start time
+    return `Tick #${tickNumber.toLocaleString()}`;
 };
 
 /**
  * Format timestamp to relative time (e.g., "2 hours ago")
+ * Note: QBlog stores Qubic tick numbers, not Unix timestamps
  */
-export const formatRelativeTime = (timestamp: number): string => {
-    const now = Date.now();
-    const diff = now - timestamp * 1000;
-
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
-    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-    return 'Just now';
+export const formatRelativeTime = (tickNumber: number): string => {
+    // For now, display tick number
+    // TODO: Convert tick to actual date and calculate relative time
+    return `Tick #${tickNumber.toLocaleString()}`;
 };
 
 /**

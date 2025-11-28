@@ -39,21 +39,11 @@ export default function ProfilePage() {
                 pageSize: 10,
             });
 
-            // Convert to PostWithId format
-            const postsWithId: PostWithId[] = result.posts.map((post, index) => ({
-                id: page * 10 + index, // Approximate ID based on page
-                author: post.author,
-                timestamp: post.timestamp,
-                likes: post.likes,
-                deleted: post.deleted,
-                title: post.title,
-                content: post.content,
-            }));
-
+            // Posts now come with real IDs from the contract
             if (page === 0) {
-                setPosts(postsWithId);
+                setPosts(result.posts);
             } else {
-                setPosts(prev => [...prev, ...postsWithId]);
+                setPosts(prev => [...prev, ...result.posts]);
             }
 
             setHasMore(result.hasMore);

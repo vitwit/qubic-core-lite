@@ -10,6 +10,8 @@ import { PostWithId } from '@/types/qblog';
 import { formatDate, stringToColor, getInitials } from '@/utils/format';
 import { truncateIdentity } from '@/lib/qubic/wallet';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { checkTransactionStatus, formatTransactionStatus } from '@/lib/qubic/transaction-tracker';
+import { CopyButton } from '@/components/CopyButton';
 
 export default function PostDetailPage() {
     const params = useParams();
@@ -18,6 +20,10 @@ export default function PostDetailPage() {
     const [post, setPost] = useState<PostWithId | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
+    const [txId, setTxId] = useState<string | null>(null);
+    const [targetTick, setTargetTick] = useState<number | null>(null);
+    const [txStatus, setTxStatus] = useState<string>('');
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const postId = params ? parseInt(params.id as string) : 0;
     const isOwner = isConnected && wallet && post && post.author === wallet.identity;
@@ -47,7 +53,7 @@ export default function PostDetailPage() {
 
         setActionLoading(true);
         try {
-            await likePost({ postId: post.id }, wallet.publicKey, wallet.privateKey);
+            await likePost({ postId: post.id }, wallet.publicKey, wallet.seed);
             setPost({ ...post, likes: post.likes + 1 });
         } catch (error) {
             console.error('Error liking post:', error);
@@ -62,12 +68,23 @@ export default function PostDetailPage() {
         if (!confirm('Are you sure you want to delete this post?')) return;
 
         setActionLoading(true);
+        setIsDeleting(true);
         try {
-            await deletePost({ postId: post.id }, wallet.publicKey, wallet.privateKey);
-            router.push('/');
+            const result = await deletePost({ postId: post.id }, wallet.publicKey, wallet.seed);
+
+            setTxId(result.txId || 'Transaction sent successfully');
+
+            if (result.txId && result.targetTick) {
+                setTargetTick(result.targetTick);
+                const status = await checkTransactionStatus(result.txId, result.targetTick);
+                setTxStatus(formatTransactionStatus(status));
+            }
+
+
         } catch (error) {
             console.error('Error deleting post:', error);
             setActionLoading(false);
+            setIsDeleting(false);
         }
     };
 
@@ -83,6 +100,55 @@ export default function PostDetailPage() {
             <div className="container mx-auto px-4 py-12">
                 <div className="max-w-3xl mx-auto">
                     <LoadingSpinner size="lg" />
+                </div>
+            </div>
+        );
+    }
+
+    if (txId && isDeleting) {
+        return (
+            <div className="container mx-auto px-4 py-12">
+                <div className="max-w-2xl mx-auto text-center">
+                    <div className="card">
+                        <div className="mb-6 text-green-500 flex justify-center">
+                            <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h2 className="text-2xl font-bold mb-4 text-gradient">Delete Broadcasted!</h2>
+                        <p className="text-gray-300 mb-6">
+                            Your delete request has been broadcast to the network.
+                        </p>
+
+                        <div className="bg-gray-800/50 rounded-lg p-4 mb-6 text-left">
+                            <div className="mb-2">
+                                <span className="text-xs text-gray-500 uppercase tracking-wider">Transaction ID</span>
+                                <div className="flex items-center gap-2">
+                                    <p className="font-mono text-sm text-blue-400 break-all">{txId}</p>
+                                    <CopyButton text={txId} />
+                                </div>
+                            </div>
+                            {targetTick && (
+                                <div className="mb-2">
+                                    <span className="text-xs text-gray-500 uppercase tracking-wider">Target Tick</span>
+                                    <p className="font-mono text-sm text-gray-300">{targetTick}</p>
+                                </div>
+                            )}
+                            <div>
+                                <span className="text-xs text-gray-500 uppercase tracking-wider">Status</span>
+                                <p className="text-sm text-yellow-400 flex items-center gap-2">
+                                    <LoadingSpinner size="sm" />
+                                    {txStatus || 'Broadcasting...'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <Link href="/" className="btn-primary">
+                                Go Home
+                            </Link>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
