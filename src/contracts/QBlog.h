@@ -19,7 +19,6 @@ struct QBlogLogger {
 
 struct Post
 {
-    uint32 postId;
     id author;
     uint64 timestamp;
     uint32 likes;
@@ -72,7 +71,6 @@ struct QBLOG : public ContractBase
         }
 
         Post newPost;
-        newPost.postId = 0; // Will be set to actual index after add()
         newPost.author = qpi.invocator();
         newPost.timestamp = qpi.tick();
         newPost.likes = 0;
@@ -98,10 +96,6 @@ struct QBLOG : public ContractBase
         }
         else
         {
-             // Update the post with its actual ID and save it back
-             newPost.postId = (uint32)index;
-             state.posts.replace(index, newPost);
-             
              output.postId = (uint32)index;
              output.returnCode = static_cast<uint32>(QBlogLogInfo::success);
              locals.log = QBlogLogger{ QBLOG_CONTRACT_INDEX, static_cast<uint32>(QBlogLogInfo::success), 0 };
@@ -308,6 +302,12 @@ struct QBLOG : public ContractBase
     }
 
     // Get Posts By User
+    struct PostWithId
+    {
+        Post post;
+        uint32 postId;
+    };
+    
     struct GetPostsByUser_input
     {
         id author;
@@ -316,7 +316,7 @@ struct QBLOG : public ContractBase
     };
     struct GetPostsByUser_output
     {
-        Array<Post, 16> posts; // Posts now include id field
+        Array<PostWithId, 16> posts;
         uint32 count;
         bit hasMore;
     };
@@ -346,7 +346,10 @@ struct QBLOG : public ContractBase
                 {
                     if (output.count < input.pageSize)
                     {
-                        output.posts.set(output.count, p);
+                        PostWithId pwi;
+                        pwi.post = p;
+                        pwi.postId = (uint32)currentIdx;
+                        output.posts.set(output.count, pwi);
                         output.count++;
                     }
                     else

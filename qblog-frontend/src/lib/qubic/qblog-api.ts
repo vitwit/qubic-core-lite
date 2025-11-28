@@ -95,10 +95,10 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
     try {
         const result = await querySmartContract(CONTRACT_INDEX, FUNCTION_INDEX.GET_POST, inputData);
 
-        // A Post struct is now 369 bytes (4 for id + 365 for other fields)
-        if (result.length < 369) {
+        // Post struct is 365 bytes (no postId field in struct)
+        if (result.length < 365) {
             return {
-                post: { postId: 0, author: '', timestamp: 0, likes: 0, deleted: false, title: '', content: '' },
+                post: { postId, author: '', timestamp: 0, likes: 0, deleted: false, title: '', content: '' },
                 exists: false
             };
         }
@@ -106,10 +106,7 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         const resultView = new DataView(result.buffer);
         let offset = 0;
 
-        // Parse Post struct: postId (4) + author (32) + timestamp (8) + likes (4) + deleted (1) + title (64) + content (256) = 369 bytes
-        const postId = resultView.getUint32(offset, true);
-        offset += 4;
-
+        // Parse Post struct (365 bytes): author (32) + timestamp (8) + likes (4) + deleted (1) + title (64) + content (256)
         const authorBytes = result.slice(offset, offset + 32);
         offset += 32;
         const author = await new QubicHelper().getIdentity(authorBytes);
@@ -123,6 +120,9 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         const deleted = result[offset] !== 0;
         offset += 1;
 
+        // Skip 3 bytes of padding
+        offset += 3;
+
         const titleBytes = result.slice(offset, offset + 64);
         const title = new TextDecoder().decode(titleBytes).replace(/\0/g, '');
         offset += 64;
@@ -135,8 +135,8 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         // Use the contract's validation logic instead: check if author is zero AND timestamp is zero
         const exists = author !== 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' || timestamp !== 0;
 
-        // Parse userLiked (bit at offset 369)
-        const userLiked = result.length > 369 ? result[369] !== 0 : false;
+        // Parse userLiked (bit at offset 365)
+        const userLiked = result.length > 365 ? result[365] !== 0 : false;
 
         return {
             post: { postId, author, timestamp, likes, deleted, title, content },
@@ -182,10 +182,9 @@ export async function getPostsByUser(input: GetPostsByUserInput): Promise<GetPos
         const resultView = new DataView(result.buffer);
         let offset = 0;
 
-        // Calculate Post Size dynamically to handle padding
-        // result.length = 16 * POST_SIZE + 4 (count) + 1 (hasMore)
-        // We assume the response is exactly this size.
-        // If not, we fallback to 369 (new Post struct size)
+        // Calculate Post Size dynamically
+        // PostWithId = Post (365 bytes) + postId (4 bytes) = 369 bytes
+        // result.length = 16 * 369 + 4 (count) + 1 (hasMore) = 5909 bytes
         const POST_SIZE = Math.floor((result.length - 5) / 16);
         console.log(`Detected POST_SIZE: ${POST_SIZE} bytes`);
 
@@ -196,12 +195,10 @@ export async function getPostsByUser(input: GetPostsByUserInput): Promise<GetPos
         for (let i = 0; i < 16; i++) {
             const postStartOffset = offset;
 
-            // Read Post struct: postId (4) + author (32) + timestamp (8) + likes (4) + deleted (1) + title (64) + content (256) = 369 bytes
+            // Read PostWithId: Post (365 bytes) + postId (4 bytes) = 369 bytes
             if (offset + 369 > result.length) break;
 
-            const pPostId = resultView.getUint32(offset, true);
-            offset += 4;
-
+            // Parse Post struct (365 bytes)
             const pAuthorBytes = result.slice(offset, offset + 32);
             offset += 32;
             const pAuthor = await new QubicHelper().getIdentity(pAuthorBytes);
@@ -222,6 +219,10 @@ export async function getPostsByUser(input: GetPostsByUserInput): Promise<GetPos
             const pContentBytes = result.slice(offset, offset + 256);
             const pContent = new TextDecoder().decode(pContentBytes).replace(/\0/g, '');
             offset += 256;
+
+            // Read postId (uint32) after Post struct
+            const pPostId = resultView.getUint32(offset, true);
+            offset += 4;
 
             // Advance to next post based on calculated size
             offset = postStartOffset + POST_SIZE;
