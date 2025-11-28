@@ -39,11 +39,16 @@ export default function ProfilePage() {
                 pageSize: 10,
             });
 
-            // Posts now come with real IDs from the contract
+            // Map Post to PostWithId (add id alias for postId)
+            const postsWithId: PostWithId[] = result.posts.map(post => ({
+                ...post,
+                id: post.postId // Add id alias for backward compatibility
+            }));
+
             if (page === 0) {
-                setPosts(result.posts);
+                setPosts(postsWithId);
             } else {
-                setPosts(prev => [...prev, ...result.posts]);
+                setPosts(prev => [...prev, ...postsWithId]);
             }
 
             setHasMore(result.hasMore);

@@ -1,7 +1,7 @@
 // QBlog Smart Contract Types
 
 export interface Post {
-    id: number; // Post ID from contract
+    postId: number; // Post ID from contract
     author: string; // 60-character Qubic identity
     timestamp: number;
     likes: number;
@@ -83,7 +83,7 @@ export enum QBlogReturnCode {
 
 // UI Types
 export interface PostWithId extends Post {
-    id: number;
+    id: number; // Alias for postId for backward compatibility
 }
 
 export interface WalletState {

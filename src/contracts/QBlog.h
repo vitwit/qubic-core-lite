@@ -19,7 +19,7 @@ struct QBlogLogger {
 
 struct Post
 {
-    uint32 id;
+    uint32 postId;
     id author;
     uint64 timestamp;
     uint32 likes;
@@ -72,7 +72,7 @@ struct QBLOG : public ContractBase
         }
 
         Post newPost;
-        newPost.id = 0; // Will be set to actual index after add()
+        newPost.postId = 0; // Will be set to actual index after add()
         newPost.author = qpi.invocator();
         newPost.timestamp = qpi.tick();
         newPost.likes = 0;
@@ -99,7 +99,7 @@ struct QBLOG : public ContractBase
         else
         {
              // Update the post with its actual ID and save it back
-             newPost.id = (uint32)index;
+             newPost.postId = (uint32)index;
              state.posts.replace(index, newPost);
              
              output.postId = (uint32)index;

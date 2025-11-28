@@ -98,7 +98,7 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         // A Post struct is now 369 bytes (4 for id + 365 for other fields)
         if (result.length < 369) {
             return {
-                post: { id: 0, author: '', timestamp: 0, likes: 0, deleted: false, title: '', content: '' },
+                post: { postId: 0, author: '', timestamp: 0, likes: 0, deleted: false, title: '', content: '' },
                 exists: false
             };
         }
@@ -106,8 +106,8 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         const resultView = new DataView(result.buffer);
         let offset = 0;
 
-        // Parse Post struct: id (4) + author (32) + timestamp (8) + likes (4) + deleted (1) + title (64) + content (256) = 369 bytes
-        const id = resultView.getUint32(offset, true);
+        // Parse Post struct: postId (4) + author (32) + timestamp (8) + likes (4) + deleted (1) + title (64) + content (256) = 369 bytes
+        const postId = resultView.getUint32(offset, true);
         offset += 4;
 
         const authorBytes = result.slice(offset, offset + 32);
@@ -139,7 +139,7 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         const userLiked = result.length > 369 ? result[369] !== 0 : false;
 
         return {
-            post: { id, author, timestamp, likes, deleted, title, content },
+            post: { postId, author, timestamp, likes, deleted, title, content },
             exists,
             userLiked
         };
@@ -147,7 +147,7 @@ export async function getPost(postId: number): Promise<GetPostOutput> {
         console.error('Error fetching post:', e);
         return {
             post: {
-                id: 0,
+                postId: 0,
                 author: '',
                 timestamp: 0,
                 likes: 0,
@@ -196,10 +196,10 @@ export async function getPostsByUser(input: GetPostsByUserInput): Promise<GetPos
         for (let i = 0; i < 16; i++) {
             const postStartOffset = offset;
 
-            // Read Post struct: id (4) + author (32) + timestamp (8) + likes (4) + deleted (1) + title (64) + content (256) = 369 bytes
+            // Read Post struct: postId (4) + author (32) + timestamp (8) + likes (4) + deleted (1) + title (64) + content (256) = 369 bytes
             if (offset + 369 > result.length) break;
 
-            const pId = resultView.getUint32(offset, true);
+            const pPostId = resultView.getUint32(offset, true);
             offset += 4;
 
             const pAuthorBytes = result.slice(offset, offset + 32);
@@ -226,13 +226,13 @@ export async function getPostsByUser(input: GetPostsByUserInput): Promise<GetPos
             // Advance to next post based on calculated size
             offset = postStartOffset + POST_SIZE;
 
-            console.log(`[getPostsByUser] Post ${i}: ID=${pId}, Author=${pAuthor}, Timestamp=${pTimestamp}`);
+            console.log(`[getPostsByUser] Post ${i}: ID=${pPostId}, Author=${pAuthor}, Timestamp=${pTimestamp}`);
 
             // Only add if not empty (check timestamp or author)
             // Check for known empty identity pattern or zero timestamp
             if (pTimestamp !== 0 && !pAuthor.startsWith('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')) {
                 posts.push({
-                    id: pId,
+                    postId: pPostId,
                     author: pAuthor,
                     timestamp: pTimestamp,
                     likes: pLikes,
